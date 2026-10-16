@@ -1,0 +1,14 @@
+# MATLAB / Simulink 生成物（每次运行会重新生成，不需要进版本库）
+slprj/
+*.slxc
+*.asv
+*.autosave
+*.m~
+
+# 仿真结果数据（run_all.m 可以重新跑出来）
+results/results_summary.mat
+
+# 系统文件
+Thumbs.db
+desktop.ini
+.DS_Store
