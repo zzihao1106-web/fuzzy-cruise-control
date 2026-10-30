@@ -1,0 +1,7 @@
+{
+  "gui_passed": true,
+  "frames_cleaned": 70,
+  "frames_recognized_after_cleaning": 70,
+  "engine": "restoration",
+  "raw_input_to_boundary": false
+}

@@ -116,7 +116,7 @@ class SpraySynthesizer:
     def smooth_noise(self, scale):
         return cv2.resize(self.rng.normal(size=(scale, scale)).astype(np.float32), (self.size, self.size), interpolation=cv2.INTER_CUBIC)
 
-    def sample(self, force_empty=False):
+    def sample(self, force_empty=False, restoration=False):
         rng, n = self.rng, self.size
         use_procedural = self.procedural_only or rng.random() < 0.4
         if use_procedural:
@@ -184,6 +184,10 @@ class SpraySynthesizer:
         edge = cv2.morphologyEx(hard, cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8))
         ambiguity = np.maximum(edge*0.65, hard*(np.abs(signal) < 0.025))
         target = np.stack([hard, edge, ambiguity]).astype(np.float32)
+        if restoration:
+            # 监督的是可观测的有符号喷雾贡献，不凭空补回完全相消的纹理。
+            clean_signed = np.clip(current_bg+signal, 0, 1)-current_bg
+            return channels(image, b_ref), target, clean_signed[None].astype(np.float32)
         return channels(image, b_ref), target
 
 

@@ -22,7 +22,7 @@ HERE = Path(__file__).resolve().parent
 class SprayTool(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("喷雾识别工具 V2 / V3深度学习试验")
+        self.title("喷雾识别工具：先去白斑，再捕捉边界")
         self.geometry(f"{min(1220, self.winfo_screenwidth()-80)}x{min(880, self.winfo_screenheight()-100)}")
         self.minsize(960, 680)
         self.config_data = json.loads((HERE / ("config.json" if (HERE / "config.json").exists() else "config.example.json")).read_text(encoding="utf-8"))
@@ -31,12 +31,12 @@ class SprayTool(tk.Tk):
             "source_dir": "", "output_dir": "", "liquid_name": "柴油", "background_frames": "5", "fps": "10000",
             "known_diameter_mm": "60", "ambient_pressure_bar": "40", "threshold_gray": "10",
             "physics_weight": "0.14", "liquid_density_kg_m3": "", "injection_pressure_MPa_label": "140", "velocity_coefficient": "",
-            "deep_checkpoint": str(HERE / "models" / "deep_spray_v3_alpha2.pt") if (HERE / "models" / "deep_spray_v3_alpha2.pt").is_file() else "",
+            "deep_checkpoint": str(HERE / "models" / "restore_spray_v4_alpha1.pt") if (HERE / "models" / "restore_spray_v4_alpha1.pt").is_file() else (str(HERE / "models" / "deep_spray_v3_alpha2.pt") if (HERE / "models" / "deep_spray_v3_alpha2.pt").is_file() else ""),
         }.items()}
         self.pressure_confirmed = tk.BooleanVar(value=False)
         self.consecutive = tk.BooleanVar(value=True)
         self.polarity = tk.StringVar(value="自动")
-        self.engine = tk.StringVar(value="V2图像证据")
+        self.engine = tk.StringVar(value="V4先去白再识别" if (HERE / "models" / "restore_spray_v4_alpha1.pt").is_file() else "V2图像证据")
         self.loaded_source = None
         self.status = tk.StringVar(value="选择一个图像序列文件夹，加载预览并检查一次标定。")
         self.geometry_info = tk.StringVar(value="尚未加载图像")
@@ -55,7 +55,7 @@ class SprayTool(tk.Tk):
         ttk.Style().configure("TButton", font=("Microsoft YaHei UI", 10))
         outer = ttk.Frame(self, padding=15); outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="喷雾物理约束识别", font=("Microsoft YaHei UI", 18, "bold")).pack(anchor="w")
-        ttk.Label(outer, text="选择序列 → 一次标定 → 自动识别全序列 → 导出轮廓、掩膜与物理量").pack(anchor="w", pady=(4, 12))
+        ttk.Label(outer, text="选择序列 → 一次标定 → 处理整段序列；V4先去白，再从处理图识别边界与生成动画").pack(anchor="w", pady=(4, 12))
         paths = ttk.Frame(outer); paths.pack(fill="x")
         for row, (key, label) in enumerate([("source_dir", "输入图像文件夹"), ("output_dir", "结果保存位置")]):
             ttk.Label(paths, text=label).grid(row=row, column=0, sticky="w", pady=4)
@@ -67,12 +67,14 @@ class SprayTool(tk.Tk):
                    state="normal" if (HERE / "config.json").exists() else "disabled").pack(side="left")
         ttk.Button(quick, text="载入本机V3示例", command=lambda: self.load_settings(HERE / "config.deep.local.json"),
                    state="normal" if (HERE / "config.deep.local.json").exists() else "disabled").pack(side="left", padx=6)
+        ttk.Button(quick, text="载入本机去白示例", command=lambda: self.load_settings(HERE / "config.restore.local.json"),
+                   state="normal" if (HERE / "config.restore.local.json").exists() else "disabled").pack(side="left", padx=6)
         ttk.Button(quick, text="加载设置…", command=self.load_settings).pack(side="left", padx=6)
         ttk.Button(quick, text="保存设置…", command=self.save_settings).pack(side="left")
         deep_row = ttk.Frame(outer); deep_row.pack(fill="x", pady=(8, 0))
         ttk.Label(deep_row, text="识别算法：").pack(side="left")
-        ttk.Combobox(deep_row, textvariable=self.engine, values=["V2图像证据", "V3深度学习试验"], state="readonly", width=19).pack(side="left")
-        ttk.Label(deep_row, text="  V3权重：").pack(side="left")
+        ttk.Combobox(deep_row, textvariable=self.engine, values=["V2图像证据", "V3深度学习试验", "V4先去白再识别"], state="readonly", width=22).pack(side="left")
+        ttk.Label(deep_row, text="  模型权重：").pack(side="left")
         ttk.Entry(deep_row, textvariable=self.variables["deep_checkpoint"]).pack(side="left", fill="x", expand=True)
         ttk.Button(deep_row, text="选择权重…", command=self.browse_checkpoint).pack(side="left", padx=(6, 0))
         middle = ttk.Frame(outer); middle.pack(fill="both", expand=True, pady=10)
@@ -95,7 +97,7 @@ class SprayTool(tk.Tk):
             ttk.Label(settings, text=label).grid(row=row*2, column=0, sticky="w", pady=(6, 0))
             ttk.Entry(settings, textvariable=self.variables[key], width=30).grid(row=row*2+1, column=0, sticky="ew")
         ttk.Checkbutton(settings, text="喷射压力及压力基准已确认", variable=self.pressure_confirmed).grid(row=2*len(fields), column=0, sticky="w", pady=7)
-        ttk.Label(settings, text="密度、尺寸、Cv与压力齐全时，\n启用伯努利速度上界。\n绿色=证据；橙色=包络；紫色=未知。", foreground="#555555").grid(row=2*len(fields)+1, column=0, sticky="w", pady=6)
+        ttk.Label(settings, text="V4：先去白再识别，暂不计算喷速。\nV2：物性与压力齐全时启用速度上界。\n紫色表示低证据或未知。", foreground="#555555").grid(row=2*len(fields)+1, column=0, sticky="w", pady=6)
         right = ttk.Frame(middle); right.pack(side="left", fill="both", expand=True)
         controls = ttk.Frame(right); controls.pack(fill="x")
         ttk.Button(controls, text="加载 / 自动估计", command=self.load_preview).pack(side="left", padx=(0, 5))
@@ -142,7 +144,7 @@ class SprayTool(tk.Tk):
         cfg["injection_pressure_confirmed"] = self.pressure_confirmed.get()
         cfg["consecutive_frames_assumed"] = self.consecutive.get()
         cfg["signal_polarity"] = {"自动": "auto", "亮喷雾": "bright", "暗喷雾": "dark"}[self.polarity.get()]
-        cfg["engine"] = "deep" if self.engine.get() == "V3深度学习试验" else "evidence"
+        cfg["engine"] = {"V2图像证据": "evidence", "V3深度学习试验": "deep", "V4先去白再识别": "restoration"}[self.engine.get()]
         cfg["radial_bins"] = None
         cfg["selected_frames"] = [1, 6, 10, 15, 20, 30, 50, 70]
         if cfg["fps"] is None or cfg["fps"] <= 0 or cfg["background_frames"] < 2:
@@ -262,7 +264,7 @@ class SprayTool(tk.Tk):
             self.pressure_confirmed.set(cfg.get("injection_pressure_confirmed", False))
             self.consecutive.set(cfg.get("consecutive_frames_assumed", True))
             self.polarity.set({"auto": "自动", "bright": "亮喷雾", "dark": "暗喷雾"}.get(cfg.get("signal_polarity"), "自动"))
-            self.engine.set("V3深度学习试验" if cfg.get("engine") == "deep" else "V2图像证据")
+            self.engine.set({"deep": "V3深度学习试验", "restoration": "V4先去白再识别"}.get(cfg.get("engine"), "V2图像证据"))
             self.load_preview(False)
         except Exception as exc:
             messagebox.showerror("无法加载配置", str(exc))
@@ -290,12 +292,13 @@ class SprayTool(tk.Tk):
             config_path = out / "工具运行设置.json"
             config_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
             command = [sys.executable, "-u", str(HERE / "spray_recognition.py"), "--config", str(config_path)]
-            if cfg["engine"] == "deep":
+            if cfg["engine"] in {"deep", "restoration"}:
                 if not Path(cfg["deep_checkpoint"]).is_file():
-                    raise ValueError("请先选择V3已训练权重（.pt）。V2无需权重。")
+                    raise ValueError("请先选择当前算法对应的已训练权重（.pt）。V2无需权重。")
                 local_python = HERE.parent.parent / ".venv-spray-v3" / "Scripts" / "python.exe"
                 interpreter = str(local_python) if local_python.is_file() else sys.executable
-                command = [interpreter, "-u", str(HERE / "deep_spray.py"), "predict", "--config", str(config_path),
+                script, operation = ("restore_spray.py", "process") if cfg["engine"] == "restoration" else ("deep_spray.py", "predict")
+                command = [interpreter, "-u", str(HERE / script), operation, "--config", str(config_path),
                            "--checkpoint", cfg["deep_checkpoint"]]
             if batch:
                 command += ["--batch", "--input", cfg["source_dir"], "--output", cfg["output_dir"]]

@@ -1,0 +1,10 @@
+{
+  "restoration_tests_passed": 5,
+  "legacy_v3_tests_passed": 14,
+  "skipped": 0,
+  "includes_actual_small_training_and_batch": true,
+  "gui_real_sequence_frames": 70,
+  "raw_input_to_boundary": false,
+  "cleaned_png_hashes_match_boundary_inputs": 70,
+  "original_images_unchanged": 70
+}

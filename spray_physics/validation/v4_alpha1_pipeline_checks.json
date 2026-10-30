@@ -1,0 +1,41 @@
+{
+  "empty_white_region_checks": [
+    {
+      "frame": 4,
+      "known_empty": true,
+      "raw_white_region_mean_gray": 162.6417999267578,
+      "cleaned_white_region_mean_gray": 2.185303211212158,
+      "cleaned_white_region_p99_gray": 6.0,
+      "fixed_display_gain": 3.0
+    },
+    {
+      "frame": 5,
+      "known_empty": true,
+      "raw_white_region_mean_gray": 162.65274047851562,
+      "cleaned_white_region_mean_gray": 2.156475305557251,
+      "cleaned_white_region_p99_gray": 6.0,
+      "fixed_display_gain": 3.0
+    }
+  ],
+  "cleaned_frames": 70,
+  "boundary_input_hash_matches": 70,
+  "original_image_hash_matches": 70,
+  "animations": {
+    "cleaned": {
+      "frames": 70,
+      "size": [
+        480,
+        480
+      ]
+    },
+    "boundary_after_cleaning": {
+      "frames": 70,
+      "size": [
+        480,
+        480
+      ]
+    }
+  },
+  "real_boundary_accuracy_available": false,
+  "segmentation_mask_used_to_erase_white_spots": false
+}

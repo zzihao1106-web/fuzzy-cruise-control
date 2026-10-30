@@ -1,0 +1,31 @@
+{
+  "version": "4.0.0-alpha1",
+  "cleaner_steps": 800,
+  "boundary_steps": 500,
+  "cleaner_seconds": 243.37658170000213,
+  "total_seconds": 377.003793200005,
+  "cleaner_parameters": 407905,
+  "boundary_parameters": 491606,
+  "batch": 4,
+  "seed": 20261101,
+  "size": 320,
+  "gain": 3.0,
+  "learning_rate": 0.001,
+  "cleaner_best_metrics": {
+    "foreground_mae": 0.011500765569508076,
+    "background_mae": 0.012577212415635586,
+    "white_background_residual_mae": 0.014107288792729378,
+    "plain_difference_foreground_mae": 0.011607255786657333,
+    "plain_difference_background_mae": 0.012691987678408623,
+    "foreground_energy_ratio": 0.9768486618995667,
+    "mse": 0.0002499533584341407,
+    "score_lower_is_better": 0.03665519040077925,
+    "synthetic_only": true
+  },
+  "best_synthetic_boundary_iou": 0.7949212644140161,
+  "peak_mib": 994.99462890625,
+  "human_labels": 0,
+  "raw_frames_used_for_boundary_input": false,
+  "real_accuracy_available": false,
+  "manifest_sha256": "fa98269f41cb721f1381d716bb8c5ed8e2da6baa7061724a8f253753aeee585d"
+}

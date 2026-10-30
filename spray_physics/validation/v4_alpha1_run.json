@@ -1,0 +1,22 @@
+{
+  "version": "4.0.0-alpha1",
+  "frames": 70,
+  "reference_frames": 3,
+  "checkpoint_sha256": "9f77934741e66860ee34dfe16d7f7db56ea520071a6a3d505880b1d9370befd9",
+  "checkpoint_version": "4.0.0-alpha1",
+  "cleaner_step": 800,
+  "boundary_step": 400,
+  "fixed_display_gain": 3.0,
+  "segmentation_mask_used_to_clean_image": false,
+  "boundary": {
+    "frames": 70,
+    "input_contract": "仅已保存去白PNG",
+    "empty_noise_level": 0.029157167300581932,
+    "raw_images_read_by_boundary_stage": false
+  },
+  "human_labels": 0,
+  "real_accuracy_available": false,
+  "seconds": 29.761639500000456,
+  "excluded_attachment_count": 1,
+  "restoration_meaning": "保留增亮/变暗的可观测喷雾贡献，黑底为固定背景剔除结果；未恢复不可观测纹理"
+}
