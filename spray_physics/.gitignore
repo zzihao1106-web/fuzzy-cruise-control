@@ -2,9 +2,16 @@ __pycache__/
 *.pyc
 config.json
 config.local.json
+config.deep.local.json
 _test_tmp/
 results/
 .local_versions/
 验证结果.json
 GUI验证结果.json
 环境版本.json
+.venv*/
+*.pt
+*.pth
+*.npz
+deep_runs/
+annotation_workspace/

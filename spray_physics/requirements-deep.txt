@@ -1,0 +1,3 @@
+# GPU版本请先按V3说明从PyTorch官方CUDA索引安装，再安装本文件。
+-r requirements.txt
+torch==2.11.0

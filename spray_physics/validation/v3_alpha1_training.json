@@ -1,0 +1,33 @@
+{
+  "version": "3.0.0-alpha1",
+  "torch": "2.11.0+cu128",
+  "cuda_runtime": "12.8",
+  "device": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "model_spec": {
+    "width": 16,
+    "iterations": 2
+  },
+  "parameters": 491606,
+  "steps": 1000,
+  "batch": 4,
+  "seed": 20261030,
+  "learning_rate": 0.001,
+  "training_size": 320,
+  "training_kind": "synthetic_only",
+  "human_annotation_frames": 0,
+  "annotation_files": [],
+  "seconds": 252.28145999999833,
+  "best_synthetic_iou": 0.8999482606446115,
+  "peak_allocated_mib": 886.33642578125,
+  "real_accuracy_available": false,
+  "reference_frames_1based": [
+    1,
+    2,
+    3
+  ],
+  "heldout_empty_frames_1based": [
+    4,
+    5
+  ],
+  "data_manifest_sha256": "fa98269f41cb721f1381d716bb8c5ed8e2da6baa7061724a8f253753aeee585d"
+}

@@ -1,0 +1,8 @@
+{
+  "v2_regression_passed": 16,
+  "v3_tests_passed": 11,
+  "v3_tests_skipped": 0,
+  "gui_configuration_switch": "passed",
+  "annotation_window_load_and_navigation": "passed",
+  "real_human_labels": 0
+}

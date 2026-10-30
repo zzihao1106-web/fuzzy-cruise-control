@@ -1,0 +1,19 @@
+{
+  "torch": "2.11.0+cu128",
+  "numpy": "2.4.4",
+  "Pillow": "12.2.0",
+  "opencv-python": "4.13.0.92",
+  "scipy": "1.17.1",
+  "matplotlib": "3.10.9",
+  "filelock": "4.2.4",
+  "sympy": "1.14.0",
+  "networkx": "3.7",
+  "fsspec": "2026.9.0",
+  "setuptools": "78.1.0",
+  "cuda_available": true,
+  "cuda_runtime": "12.8",
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "wheel_sha256": "6f367e62fd81b75cdf23ca4b75ced834d2db2cf98d1588ac935bde345de9de23",
+  "isolated_environment": true,
+  "inherits_existing_image_dependencies": true
+}

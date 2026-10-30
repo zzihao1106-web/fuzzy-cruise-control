@@ -1,0 +1,27 @@
+{
+  "tp": 494333,
+  "fp": 14841,
+  "fn": 36309,
+  "tn": 4091509,
+  "iou": 0.9062298916739844,
+  "recall": 0.9315753370445611,
+  "background_false_positive_rate": 0.0036141585593044917,
+  "low_contrast_recall": 0.315712024258099,
+  "low_contrast_pixels": 44851,
+  "absolute_difference_baseline": {
+    "tp": 455165,
+    "fp": 17707,
+    "fn": 75477,
+    "tn": 4088643,
+    "iou": 0.8300644297700916,
+    "recall": 0.8577628608364962,
+    "background_false_positive_rate": 0.004312101988383845
+  },
+  "boundary_f1_tolerance_2_processing_pixels": 0.9458329376258328,
+  "synthetic_only": true,
+  "seed": 912730,
+  "checkpoint_sha256": "ee48c0d38f83ffec67c76620a83f10cdb1f757e866bbb0f31ef67b314a1d246d",
+  "split": "程序生成的新背景与新喷束；未用于训练或best选择的合成测试种子",
+  "real_boundary_accuracy": null,
+  "training_kind": "synthetic_only"
+}

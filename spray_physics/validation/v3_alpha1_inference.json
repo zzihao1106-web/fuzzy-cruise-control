@@ -1,0 +1,44 @@
+{
+  "version": "3.0.0-alpha1",
+  "frames": 70,
+  "background_reference_frames": 3,
+  "heldout_empty_checks": [
+    {
+      "frame": 4,
+      "raw_model_false_positive_fraction": 0.0,
+      "final_mask_fraction": 0.0,
+      "independent_experiment": false
+    },
+    {
+      "frame": 5,
+      "raw_model_false_positive_fraction": 0.0,
+      "final_mask_fraction": 0.0,
+      "independent_experiment": false
+    }
+  ],
+  "exact_background_raw_false_positive_fraction": 0.0,
+  "checkpoint_sha256": "ee48c0d38f83ffec67c76620a83f10cdb1f757e866bbb0f31ef67b314a1d246d",
+  "checkpoint_training_kind": "synthetic_only",
+  "checkpoint_step": 900,
+  "model_spec": {
+    "width": 16,
+    "iterations": 2
+  },
+  "inference_size": 512,
+  "real_boundary_accuracy": null,
+  "uncertainty_calibrated": false,
+  "timing_seconds_including_io": 17.013245900001493,
+  "measurement_definition": "模型喷雾区域；不是已标定的液滴边界或V2外包络，不导出物理面积/速度结论",
+  "physics_constraints": [
+    "标定视窗",
+    "喷嘴连通分量",
+    "无观测测量降级"
+  ],
+  "not_implemented": [
+    "真实边界监督训练",
+    "时序状态网络",
+    "定量喷速约束",
+    "物理透明度反演"
+  ],
+  "excluded_attachment_count": 1
+}
