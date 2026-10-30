@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+config.json
+config.local.json
+_test_tmp/
+results/
+.local_versions/
+验证结果.json
+GUI验证结果.json
+环境版本.json
