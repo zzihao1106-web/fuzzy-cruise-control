@@ -1,0 +1,13 @@
+{
+  "version": "3.0.0-alpha2",
+  "v3_tests_passed": 14,
+  "v3_tests_skipped": 0,
+  "v2_baseline_tests_previously_passed": 16,
+  "gui_full_real_sequence_frames": 70,
+  "gui_engine_switch": "passed",
+  "annotation_window_load_and_navigation": "passed",
+  "real_human_labels": 0,
+  "real_boundary_accuracy_available": false,
+  "original_images_hash_checked": 70,
+  "mismatch_count": 0
+}

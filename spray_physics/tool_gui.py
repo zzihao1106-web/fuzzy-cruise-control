@@ -31,7 +31,7 @@ class SprayTool(tk.Tk):
             "source_dir": "", "output_dir": "", "liquid_name": "柴油", "background_frames": "5", "fps": "10000",
             "known_diameter_mm": "60", "ambient_pressure_bar": "40", "threshold_gray": "10",
             "physics_weight": "0.14", "liquid_density_kg_m3": "", "injection_pressure_MPa_label": "140", "velocity_coefficient": "",
-            "deep_checkpoint": "",
+            "deep_checkpoint": str(HERE / "models" / "deep_spray_v3_alpha2.pt") if (HERE / "models" / "deep_spray_v3_alpha2.pt").is_file() else "",
         }.items()}
         self.pressure_confirmed = tk.BooleanVar(value=False)
         self.consecutive = tk.BooleanVar(value=True)

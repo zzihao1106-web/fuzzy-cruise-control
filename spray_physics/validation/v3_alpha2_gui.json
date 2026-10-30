@@ -1,0 +1,8 @@
+{
+  "gui_full_sequence_passed": true,
+  "frames": 70,
+  "checkpoint_version": "3.0.0-alpha2",
+  "context_size": 320,
+  "source_data_modified": false,
+  "real_human_annotation_frames": 0
+}

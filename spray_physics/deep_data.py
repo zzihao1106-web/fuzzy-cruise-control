@@ -68,6 +68,7 @@ def prepare(folder, cfg, output, size=320):
     output = Path(output)
     if output.resolve() == Path(folder).resolve():
         raise ValueError("数据准备输出不能与原图目录相同。")
+    cfg = {**cfg, "source_dir": str(Path(folder).resolve())}
     output.mkdir(parents=True, exist_ok=True)
     paths, excluded = discover_sequence(folder)
     count = int(cfg.get("background_frames", 5))
@@ -100,7 +101,7 @@ def prepare(folder, cfg, output, size=320):
 
 class SpraySynthesizer:
     """合成监督有已知掩膜；随机种子分离，不将其称为真实喷雾标注。"""
-    def __init__(self, background_path, source_normalized=(0.5, 0.5), seed=20261030, procedural_only=False):
+    def __init__(self, background_path, source_normalized=(0.5, 0.5), seed=20261030, procedural_only=False, curriculum=False):
         with np.load(background_path) as z:
             self.pool = z["pool"].astype(np.float32)
             self.background = z["background"].astype(np.float32)
@@ -109,6 +110,7 @@ class SpraySynthesizer:
         self.source = source_normalized
         self.rng = np.random.default_rng(seed)
         self.procedural_only = procedural_only
+        self.curriculum = curriculum
         self.yy, self.xx = np.indices(self.background.shape, dtype=np.float32)
 
     def smooth_noise(self, scale):
@@ -132,6 +134,10 @@ class SpraySynthesizer:
         b_ref = b.copy()
         # 没有喷雾时也模拟光照漂移，防止绝对差被直接学成前景。
         current_bg = np.clip(b*rng.uniform(0.97, 1.03) + rng.uniform(-0.012, 0.012) + self.smooth_noise(3)*0.008, 0, 1)
+        if self.curriculum:
+            radius = np.hypot(self.xx-n/2, self.yy-n/2)
+            ring = np.exp(-((radius-n*0.47)/(n*0.009))**2)
+            current_bg = np.clip(current_bg+ring*rng.uniform(-0.07, 0.07), 0, 1)
         mask = np.zeros_like(b)
         if not force_empty and rng.random() > 0.25:
             cx = (self.source[0] + rng.uniform(-0.08, 0.08))*n
@@ -153,6 +159,10 @@ class SpraySynthesizer:
                 signed = np.minimum(cap-r, lateral) + rough
                 plume = np.clip((signed+1.2)/2.4, 0, 1)*(r > 2)
                 mask = np.maximum(mask, plume)
+            if self.curriculum and base_length > n*0.2:
+                # 晚期可出现合并云团，避免训练集永远只有互不相交的细射线。
+                core_radius = rng.uniform(0.05, 0.20)*n
+                mask = np.maximum(mask, np.clip((core_radius-r+rough+1)/2, 0, 1))
         mask *= self.roi
         opacity = rng.uniform(0.3, 0.95)
         scatter = rng.uniform(0.15, 0.85)
@@ -160,6 +170,15 @@ class SpraySynthesizer:
             scatter = 0.0
         texture = np.clip(0.8 + 0.12*self.smooth_noise(36) + 0.08*self.smooth_noise(10), 0.3, 1.2)
         signal = mask*texture*(scatter-opacity*current_bg)
+        if self.curriculum:
+            # 人工制造白斑遮断；保持潜在掩膜，并把不可见性作为辅助目标。
+            threshold = max(0.45, float(np.quantile(b[self.roi], 0.80)))
+            white = np.clip((b-threshold)*20, 0, 1)
+            white = cv2.GaussianBlur(white, (5, 5), 1)
+            signal *= 1-white*rng.uniform(0.85, 1.0)
+            if rng.random() < 0.35:
+                center = np.exp(-((self.xx-n/2)**2+(self.yy-n/2)**2)/(n*0.12)**2)
+                signal *= 1-center*rng.uniform(0.70, 1.0)
         image = np.clip(current_bg+signal+rng.normal(0, rng.uniform(0.002, 0.009), b.shape), 0, 1).astype(np.float32)
         hard = (mask > 0.15).astype(np.float32)
         edge = cv2.morphologyEx(hard, cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8))

@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-DEEP_VERSION = "3.0.0-alpha1"
+DEEP_VERSION = "3.0.0-alpha2"
 
 
 class Block(nn.Module):
@@ -59,7 +59,7 @@ class BackgroundUNet(nn.Module):
         return outputs
 
 
-def supervised_loss(outputs, targets, valid=None):
+def supervised_loss(outputs, targets, valid=None, weak_weight=0.0):
     """未知标注通过valid屏蔽；不可见性头仅作为未校准的提示。"""
     if valid is None:
         valid = torch.ones_like(targets[:, :1])
@@ -68,7 +68,9 @@ def supervised_loss(outputs, targets, valid=None):
         p = z[:, :1].sigmoid()
         target = targets[:, :1]
         ce = F.binary_cross_entropy_with_logits(z[:, :1], target, reduction="none")
-        ce = (ce * valid).sum() / valid.sum().clamp_min(1)
+        # 弱对比喷雾只提高保留权重，不要求把背景残差全部抹零。
+        weight = 1 + weak_weight*target*targets[:, 2:3]
+        ce = (ce * valid * weight).sum() / (valid * weight).sum().clamp_min(1)
         inter = (p * target * valid).sum((1, 2, 3))
         dice = 1 - ((2 * inter + 1) / ((p * valid).sum((1, 2, 3)) + (target * valid).sum((1, 2, 3)) + 1))
         aux = F.binary_cross_entropy_with_logits(z[:, 1:], targets[:, 1:], reduction="none")

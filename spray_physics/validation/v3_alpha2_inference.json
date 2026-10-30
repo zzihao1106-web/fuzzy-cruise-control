@@ -1,0 +1,51 @@
+{
+  "version": "3.0.0-alpha2",
+  "frames": 70,
+  "background_reference_frames": 3,
+  "heldout_empty_checks": [
+    {
+      "frame": 4,
+      "raw_model_false_positive_fraction": 0.0,
+      "final_mask_fraction": 0.0,
+      "independent_experiment": false
+    },
+    {
+      "frame": 5,
+      "raw_model_false_positive_fraction": 0.0,
+      "final_mask_fraction": 0.0,
+      "independent_experiment": false
+    }
+  ],
+  "exact_background_raw_false_positive_fraction": 0.0,
+  "checkpoint_sha256": "38c47fe938cbaee561a609e8ffb225ef4621475b6111ac2a6023a5ba93a18661",
+  "checkpoint_training_kind": "synthetic_only",
+  "checkpoint_step": 400,
+  "checkpoint_version": "3.0.0-alpha2",
+  "checkpoint_curriculum": true,
+  "checkpoint_weak_weight": 3.0,
+  "model_spec": {
+    "width": 16,
+    "iterations": 2
+  },
+  "inference_size": 512,
+  "context_size": 320,
+  "context_fusion": "双尺度概率均值，较大分歧标未知",
+  "noise_threshold_normalized": 0.05490198731422424,
+  "weak_highlight_unknown_rule": "亮背景且变化低于max(2倍背景噪声阈值,0.035)时，高分模型预测仍标未知",
+  "real_boundary_accuracy": null,
+  "uncertainty_calibrated": false,
+  "timing_seconds_including_io": 19.225666999998793,
+  "measurement_definition": "模型喷雾区域；不是已标定的液滴边界或V2外包络，不导出物理面积/速度结论",
+  "physics_constraints": [
+    "标定视窗",
+    "喷嘴连通分量",
+    "无观测测量降级"
+  ],
+  "not_implemented": [
+    "真实边界监督训练",
+    "时序状态网络",
+    "定量喷速约束",
+    "物理透明度反演"
+  ],
+  "excluded_attachment_count": 1
+}

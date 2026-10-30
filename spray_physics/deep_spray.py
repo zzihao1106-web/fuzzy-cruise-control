@@ -28,6 +28,16 @@ def runtime(device="auto"):
     return torch, torch.device(device)
 
 
+def input_config(cfg, folder, reuse_geometry=False):
+    """CLI切换新序列时重新估计几何，除非用户显式声明复用。"""
+    cfg = dict(cfg)
+    old = cfg.get("source_dir")
+    if old and Path(old).resolve() != Path(folder).resolve() and not reuse_geometry:
+        cfg.update(source_xy=None, chamber_xy=None, chamber_axes_px=None, mm_per_pixel=None)
+    cfg["source_dir"] = str(Path(folder).resolve())
+    return cfg
+
+
 def score_batch(probability, target, roi=None):
     pred, truth = probability > 0.5, target > 0.5
     valid = np.ones_like(pred, bool) if roi is None else np.broadcast_to(roi, pred.shape)
@@ -118,7 +128,10 @@ def load_annotations(folder, manifest, size):
 def train(args):
     torch, device = runtime(args.device)
     from deep_model import BackgroundUNet, DEEP_VERSION, supervised_loss
-    if args.steps < 1 or args.batch < 1 or args.eval_every < 1 or args.lr <= 0:
+    weak_weight = getattr(args, "weak_weight", 0.0)
+    selection_weak = getattr(args, "selection_weak", 0.0)
+    curriculum = getattr(args, "curriculum", False)
+    if args.steps < 1 or args.batch < 1 or args.eval_every < 1 or args.lr <= 0 or weak_weight < 0 or selection_weak < 0:
         raise ValueError("训练步数、batch、评估间隔和学习率必须为正。")
     out, data = Path(args.output), Path(args.data)
     out.mkdir(parents=True, exist_ok=True)
@@ -135,13 +148,13 @@ def train(args):
         if checkpoint["model_spec"] != model.spec:
             raise ValueError("继续训练的模型结构与参数不一致。")
         model.load_state_dict(checkpoint["state_dict"])
-    synth = SpraySynthesizer(data/"backgrounds.npz", manifest["source_normalized"], args.seed)
+    synth = SpraySynthesizer(data/"backgrounds.npz", manifest["source_normalized"], args.seed, curriculum=curriculum)
     annotations = load_annotations(args.labels, manifest, synth.size)
     if args.labels and not annotations:
         raise ValueError("指定的标注目录没有确定标注；不能将未知标签当作监督。")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
-    rows, best, start = [], -1, time.perf_counter()
+    rows, best, best_metrics, start = [], -1, None, time.perf_counter()
     for step in range(1, args.steps+1):
         model.train()
         samples = [synth.sample() for _ in range(args.batch)]
@@ -149,7 +162,7 @@ def train(args):
         target = torch.from_numpy(np.stack([b for _, b in samples])).to(device)
         opt.zero_grad(set_to_none=True)
         with torch.autocast(device_type=device.type, enabled=device.type == "cuda"):
-            loss = supervised_loss(model(x), target)
+            loss = supervised_loss(model(x), target, weak_weight=weak_weight)
             if annotations and step % 2 == 0:
                 a, b, v, _ = annotations[step//2 % len(annotations)]
                 real_z = model(torch.from_numpy(a[None]).to(device))[-1][:, :1]
@@ -169,15 +182,18 @@ def train(args):
             # 每次同一验证随机种子；只用程序生成背景，与训练真实背景分开。
             val = SpraySynthesizer(data/"backgrounds.npz", manifest["source_normalized"], args.seed+100000, True)
             metrics = evaluate_synthetic(model, val, device)
+            selection_score = metrics["iou"] + selection_weak*(metrics["low_contrast_recall"] or 0)
             row = {"step": step, "loss": float(loss.item()), **metrics}
             rows.append(row)
             checkpoint = {"state_dict": model.state_dict(), "model_spec": model.spec, "version": DEEP_VERSION,
                           "seed": args.seed, "step": step, "training_kind": "synthetic_plus_reviewed" if annotations else "synthetic_only",
                           "annotation_count": len(annotations), "annotation_files": [a[3] for a in annotations],
-                          "size": synth.size, "validation": metrics}
+                          "size": synth.size, "validation": metrics, "selection_score": selection_score,
+                          "curriculum": curriculum, "weak_weight": weak_weight,
+                          "selection_weak": selection_weak}
             torch.save(checkpoint, out/"last.pt")
-            if metrics["iou"] > best:
-                best = metrics["iou"]
+            if selection_score > best:
+                best, best_metrics = selection_score, metrics
                 torch.save(checkpoint, out/"best.pt")
             write_json(out/"training_log.json", rows)
             print(f"程序生成背景验证：IoU={metrics['iou']:.3f}，低对比召回={metrics['low_contrast_recall']}（仅合成）", flush=True)
@@ -187,7 +203,10 @@ def train(args):
                "seed": args.seed, "learning_rate": args.lr, "training_size": synth.size,
                "training_kind": "synthetic_plus_reviewed" if annotations else "synthetic_only",
                "human_annotation_frames": len(annotations), "annotation_files": [a[3] for a in annotations],
-               "seconds": time.perf_counter()-start, "best_synthetic_iou": best,
+               "seconds": time.perf_counter()-start, "best_synthetic_iou": best_metrics["iou"],
+               "best_selection_score": best, "selection_weak": selection_weak,
+               "curriculum": curriculum, "weak_weight": weak_weight,
+               "warm_started": bool(args.resume), "parent_checkpoint_sha256": hashlib.sha256(Path(args.resume).read_bytes()).hexdigest() if args.resume else None,
                "peak_allocated_mib": torch.cuda.max_memory_allocated()/2**20 if device.type == "cuda" else None,
                "real_accuracy_available": False, "reference_frames_1based": manifest["reference_frames_1based"],
                "heldout_empty_frames_1based": manifest["heldout_empty_frames_1based"],
@@ -204,6 +223,25 @@ def load_model(checkpoint_path, device):
     model.load_state_dict(checkpoint["state_dict"])
     model.eval()
     return model, checkpoint
+
+
+def network_prediction(model, inp, context_size=0):
+    """细尺度保留纹理，训练尺度补充上下文；分歧交给未知提示。"""
+    import torch
+    with torch.inference_mode():
+        stages = [z.sigmoid().float().cpu().numpy()[0] for z in model(inp)]
+        fused = stages[-1].copy()
+        disagreement = np.zeros_like(fused[0])
+        if context_size and inp.shape[-2:] != (context_size, context_size):
+            small = torch.nn.functional.interpolate(inp[:, :2], (context_size, context_size), mode="area")
+            delta = small[:, :1]-small[:, 1:2]
+            small = torch.cat([small, delta.clamp_min(0), (-delta).clamp_min(0)], 1)
+            coarse = model(small)[-1].sigmoid()
+            coarse = torch.nn.functional.interpolate(coarse, inp.shape[-2:], mode="bilinear", align_corners=False)[0].float().cpu().numpy()
+            disagreement = np.abs(fused[0]-coarse[0])
+            fused[0] = (fused[0]+coarse[0])*0.5
+            fused[2] = np.maximum(fused[2], coarse[2])
+    return stages, fused, disagreement
 
 
 def font(size=19):
@@ -244,7 +282,9 @@ def predict(args):
     from spray_recognition import auto_geometry, discover_sequence
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
     folder = args.input or cfg["source_dir"]
+    cfg = input_config(cfg, folder, getattr(args, "reuse_geometry", False))
     output = Path(args.output or cfg["output_dir"])
+    cfg["output_dir"] = str(output.resolve())
     if output.resolve() == Path(folder).resolve():
         raise ValueError("输出不能与原图文件夹相同。")
     output.mkdir(parents=True, exist_ok=True)
@@ -255,6 +295,10 @@ def predict(args):
     if not all(cfg.get(k) is not None for k in ("source_xy", "chamber_xy", "chamber_axes_px")):
         cfg.update(auto_geometry(paths, count))
     model, checkpoint = load_model(args.checkpoint, device)
+    context_size = getattr(args, "context_size", None)
+    context_size = int(checkpoint["size"]) if context_size is None else context_size
+    if context_size and context_size < 32:
+        raise ValueError("上下文尺寸应为0（关闭）或至少32。")
     fit_count = max(1, count-min(2, count-1))
     background = np.median(np.stack([read_gray(p) for p in paths[:fit_count]]), 0)
     bounds, roi, static = crop_geometry(background.shape, cfg)
@@ -277,9 +321,8 @@ def predict(args):
         corrected, photometry = correct_photometry(image, background, static)
         im, bg = crop_resize(image, bounds, args.size), crop_resize(corrected, bounds, args.size)
         inp = torch.from_numpy(channels(im, bg)[None]).to(device)
-        with torch.inference_mode():
-            stages = [z.sigmoid().float().cpu().numpy()[0] for z in model(inp)]
-        p, edge, ambiguity = stages[-1]
+        stages, fused, disagreement = network_prediction(model, inp, context_size)
+        p, edge, ambiguity = fused
         raw_mask = (p > 0.5) & small_roi
         model_counts.append(int(raw_mask.sum()))
         mask = source_connected(raw_mask, small_source, max(4, args.size*0.065))
@@ -288,16 +331,21 @@ def predict(args):
         valid_observation = int(observed.sum()) >= max(12, int(small_roi.sum()*0.0005))
         # 无观测时清空确定测量，模型原始概率仍然保存供反事实检查。
         unknown = (((p > 0.2) & (p < 0.8)) | ((ambiguity > 0.5) & (p > 0.25))) & small_roi
+        unknown |= (disagreement > 0.35) & (p > 0.2) & small_roi
+        highlight_level = max(0.45, float(np.quantile(bg[small_roi], 0.80)))
+        # 网络高分不能代替观测；亮背景上几乎无变化的预测仍须标未知。
+        unknown |= (p > 0.5) & (bg > highlight_level) & (delta < max(noise*2, 0.035)) & small_roi
         # 几何筛除与真实背景不是同一概念，保留被拒绝模型区域供复核。
         unknown |= raw_mask & ~mask
         if not valid_observation:
             unknown |= mask
             mask[:] = False
-        current = (p-stages[0][0]) if len(stages) > 1 else np.zeros_like(p)
+        current = (stages[-1][0]-stages[0][0]) if len(stages) > 1 else np.zeros_like(p)
         row = {"frame": i, "name": path.name, "measurement_valid": valid_observation,
                "model_pixels_before_gate": int(raw_mask.sum()), "source_connected_pixels": int(mask.sum()),
                "unknown_pixels": int(unknown.sum()), "observed_pixels": int(observed.sum()),
                "refinement_mean_absolute_change": float(np.abs(current[small_roi]).mean()),
+               "context_mean_absolute_change": float(np.abs(p-stages[-1][0])[small_roi].mean()),
                "gain": photometry["gain"], "offset": photometry["offset"]}
         rows.append(row)
         if fit_count < i <= count:
@@ -315,6 +363,8 @@ def predict(args):
         if i in selected:
             for stage_index, stage in enumerate(stages):
                 Image.fromarray(np.uint8(stage[0]*255)).save(output/"iterations"/f"{i:06d}_stage{stage_index}.png")
+            if context_size:
+                Image.fromarray(np.uint8(p*255)).save(output/"iterations"/f"{i:06d}_context_fused.png")
             v2 = None
             if args.v2:
                 candidate = Path(args.v2)/"envelope_masks"/f"{i:06d}.png"
@@ -328,8 +378,8 @@ def predict(args):
             print(f"V3推理 {i}/{len(paths)}", flush=True)
     # 精确背景反事实不经过观测门控，直接检查网络是否会凭空画喷雾。
     b = crop_resize(background, bounds, args.size)
-    with torch.inference_mode():
-        null_p = model(torch.from_numpy(channels(b, b)[None]).to(device))[-1][0, 0].sigmoid().cpu().numpy()
+    _, null_result, _ = network_prediction(model, torch.from_numpy(channels(b, b)[None]).to(device), context_size)
+    null_p = null_result[0]
     null_fraction = float(((null_p > 0.5) & small_roi).sum()/small_roi.sum())
     if previews:
         canvas = Image.new("RGB", (previews[0].width, sum(p.height for p in previews)), "white")
@@ -343,7 +393,13 @@ def predict(args):
                "heldout_empty_checks": empty_checks, "exact_background_raw_false_positive_fraction": null_fraction,
                "checkpoint_sha256": hashlib.sha256(Path(args.checkpoint).read_bytes()).hexdigest(),
                "checkpoint_training_kind": checkpoint["training_kind"], "checkpoint_step": checkpoint["step"],
+               "checkpoint_version": checkpoint["version"],
+               "checkpoint_curriculum": checkpoint.get("curriculum", False),
+               "checkpoint_weak_weight": checkpoint.get("weak_weight", 0.0),
                "model_spec": checkpoint["model_spec"], "inference_size": args.size,
+               "context_size": context_size, "context_fusion": "双尺度概率均值，较大分歧标未知" if context_size and context_size != args.size else "关闭或同尺度",
+               "noise_threshold_normalized": noise,
+               "weak_highlight_unknown_rule": "亮背景且变化低于max(2倍背景噪声阈值,0.035)时，高分模型预测仍标未知",
                "real_boundary_accuracy": None, "uncertainty_calibrated": False,
                "timing_seconds_including_io": time.perf_counter()-start,
                "measurement_definition": "模型喷雾区域；不是已标定的液滴边界或V2外包络，不导出物理面积/速度结论",
@@ -363,14 +419,17 @@ def evaluate(args):
     model, checkpoint = load_model(args.checkpoint, device)
     data = Path(args.data)
     manifest = json.loads((data/"manifest.json").read_text(encoding="utf-8"))
-    synth = SpraySynthesizer(data/"backgrounds.npz", manifest["source_normalized"], args.seed, True)
+    synth = SpraySynthesizer(data/"backgrounds.npz", manifest["source_normalized"], args.seed, True,
+                             curriculum=getattr(args, "curriculum_test", False))
     scores = evaluate_synthetic(model, synth, device, batches=args.batches)
     scores.update(seed=args.seed, checkpoint_sha256=hashlib.sha256(Path(args.checkpoint).read_bytes()).hexdigest(),
+                  curriculum_test=getattr(args, "curriculum_test", False),
                   split="程序生成的新背景与新喷束；未用于训练或best选择的合成测试种子",
                   real_boundary_accuracy=None, training_kind=checkpoint["training_kind"])
     write_json(args.output, scores)
     # 合成图明确保留真值列，不把示意数据冒充真实实验处理效果。
-    viz = SpraySynthesizer(data/"backgrounds.npz", manifest["source_normalized"], args.seed, True)
+    viz = SpraySynthesizer(data/"backgrounds.npz", manifest["source_normalized"], args.seed, True,
+                           curriculum=getattr(args, "curriculum_test", False))
     canvas = Image.new("RGB", (1280, 3*350), "white")
     draw = ImageDraw.Draw(canvas)
     with torch.inference_mode():
@@ -412,6 +471,8 @@ def predict_batch(args):
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
     folder = Path(args.input or cfg["source_dir"])
     output = Path(args.output or cfg["output_dir"])
+    if output.resolve() == folder.resolve():
+        raise ValueError("批处理输出不能与输入根目录相同。")
     output.mkdir(parents=True, exist_ok=True)
     records = []
     for child in sorted(folder.iterdir()):
@@ -444,6 +505,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("prepare", help="生成背景训练池与帧清单")
     p.add_argument("--config", required=True); p.add_argument("--input")
+    p.add_argument("--reuse-geometry", action="store_true", help="切换输入目录时显式复用既有标定")
     p.add_argument("--output", required=True); p.add_argument("--size", type=int, default=320)
     p = sub.add_parser("train", help="合成预训练，可混合显式复核标注")
     p.add_argument("--data", required=True); p.add_argument("--output", required=True)
@@ -451,10 +513,15 @@ def main():
     p.add_argument("--width", type=int, default=16); p.add_argument("--iterations", type=int, default=2)
     p.add_argument("--lr", type=float, default=0.001); p.add_argument("--seed", type=int, default=20261030)
     p.add_argument("--eval-every", type=int, default=100); p.add_argument("--resume"); p.add_argument("--labels")
+    p.add_argument("--curriculum", action="store_true", help="增加白斑遮断、窗框扰动和晚期合并云团")
+    p.add_argument("--weak-weight", type=float, default=0.0, help="低对比前景的附加监督权重")
+    p.add_argument("--selection-weak", type=float, default=0.0, help="最佳模型评分中低对比召回的系数")
     p.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     p = sub.add_parser("predict", help="用已训练权重处理完整序列")
     p.add_argument("--config", required=True); p.add_argument("--checkpoint", required=True)
     p.add_argument("--input"); p.add_argument("--output"); p.add_argument("--size", type=int, default=512)
+    p.add_argument("--context-size", type=int, default=None, help="默认使用训练尺寸的上下文分支；0为关闭")
+    p.add_argument("--reuse-geometry", action="store_true", help="切换输入目录时显式复用既有标定")
     p.add_argument("--v2", help="可选V2结果目录用于同图对照")
     p.add_argument("--batch", action="store_true", help="对子文件夹分别重估背景和几何")
     p.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
@@ -462,6 +529,7 @@ def main():
     p.add_argument("--data", required=True); p.add_argument("--checkpoint", required=True)
     p.add_argument("--output", required=True); p.add_argument("--batches", type=int, default=16)
     p.add_argument("--seed", type=int, default=912730)
+    p.add_argument("--curriculum-test", action="store_true", help="额外评估遮断等困难样本，不与普通测试混称同分布")
     p.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     p = sub.add_parser("evaluate-labels", help="对显式真实标注评分，报告覆盖率与训练重叠")
     p.add_argument("--data", required=True); p.add_argument("--labels", required=True)
@@ -472,7 +540,9 @@ def main():
         if args.size < 32:
             raise ValueError("训练尺寸至少32像素。")
         cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
-        info = prepare(args.input or cfg["source_dir"], cfg, args.output, args.size)
+        folder = args.input or cfg["source_dir"]
+        cfg = input_config(cfg, folder, args.reuse_geometry)
+        info = prepare(folder, cfg, args.output, args.size)
         print(f"已准备{len(info['files'])}帧，背景参考{info['reference_frames_1based']}，留出空背景{info['heldout_empty_frames_1based']}")
     elif args.command == "train":
         train(args)

@@ -6,16 +6,22 @@ import argparse
 import contextlib
 import io
 import json
+import shutil
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
 from deep_data import SpraySynthesizer, channels, correct_photometry, source_connected
-from deep_spray import boundary_f1, score_batch
+from deep_spray import boundary_f1, score_batch, input_config
 
 
 class DataTests(unittest.TestCase):
+    def test_new_input_does_not_reuse_old_geometry_implicitly(self):
+        cfg = {"source_dir": "sequence_a", "source_xy": [20, 20], "chamber_xy": [20, 20], "chamber_axes_px": [15, 15]}
+        self.assertIsNone(input_config(cfg, "sequence_b")["source_xy"])
+        self.assertEqual(input_config(cfg, "sequence_b", True)["source_xy"], [20, 20])
+        self.assertEqual(cfg["source_xy"], [20, 20])
     def test_metrics_do_not_score_unknown_as_background(self):
         prediction = np.ones((32, 32), np.float32)
         target = np.zeros_like(prediction); target[:, 16:] = 1
@@ -69,6 +75,11 @@ class DataTests(unittest.TestCase):
             np.testing.assert_array_equal(x, x2)
             np.testing.assert_array_equal(y, y2)
             self.assertTrue(np.isfinite(x).all())
+            hard = SpraySynthesizer(p, seed=42, curriculum=True)
+            for _ in range(8):
+                difficult_x, difficult_y = hard.sample()
+                self.assertTrue(np.isfinite(difficult_x).all())
+                self.assertTrue(np.isfinite(difficult_y).all())
 
 
 try:
@@ -80,9 +91,24 @@ except ImportError:
 
 @unittest.skipIf(torch is None, "需要独立PyTorch环境")
 class ModelTests(unittest.TestCase):
+    def test_multiscale_restores_original_shape_and_reports_disagreement(self):
+        from deep_spray import network_prediction
+        model = BackgroundUNet(8, 1).eval()
+        stages, fused, disagreement = network_prediction(model, torch.rand(1, 4, 35, 47), 32)
+        self.assertEqual(fused.shape, (3, 35, 47))
+        self.assertEqual(disagreement.shape, (35, 47))
+        self.assertTrue(np.isfinite(fused).all())
+        self.assertGreaterEqual(float(disagreement.min()), 0)
+
+    def test_low_contrast_supervision_has_higher_gradient(self):
+        z = torch.zeros(1, 3, 16, 16, requires_grad=True)
+        target = torch.zeros_like(z); target[:, 0] = 1; target[:, 2, 8, 8] = 1
+        supervised_loss([z], target, weak_weight=3).backward()
+        self.assertGreater(float(z.grad[0, 0, 8, 8].abs()), float(z.grad[0, 0, 8, 9].abs()))
+
     def test_training_checkpoint_and_whole_sequence_export(self):
         from deep_data import prepare
-        from deep_spray import predict, train
+        from deep_spray import predict, predict_batch, train
         root = Path(__file__).parent/"_test_tmp"; root.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=root) as folder:
             path = Path(folder)
@@ -110,6 +136,16 @@ class ModelTests(unittest.TestCase):
             self.assertEqual(len(list((output/"probability").glob("*.png"))), 6)
             self.assertEqual(int(np.asarray(Image.open(output/"model_masks/000001.png")).sum()), 0)
             self.assertEqual(len(list(source.glob("*.png"))), 6)
+            batch_input = path/"批处理输入"; batch_input.mkdir()
+            shutil.copytree(source, batch_input/"有效序列")
+            (batch_input/"空文件夹").mkdir()
+            batch_output = path/"批处理结果"
+            with contextlib.redirect_stdout(io.StringIO()):
+                predict_batch(argparse.Namespace(config=str(config_path), checkpoint=str(weights/"best.pt"),
+                    device="cpu", input=str(batch_input), output=str(batch_output), size=64, v2=None))
+            records = json.loads((batch_output/"deep_batch_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(sum(r["status"] == "ok" for r in records), 1)
+            self.assertEqual(sum(r["status"] == "skipped_no_images" for r in records), 1)
 
     def test_refinement_and_odd_size_gradient(self):
         torch.set_num_threads(2)
