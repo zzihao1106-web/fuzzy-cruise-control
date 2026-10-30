@@ -65,3 +65,7 @@ Simulink 模型与手写 MATLAB 参考解交叉校核，最大车速偏差小于
 - MATLAB R2024a
 - Simulink
 - Fuzzy Logic Toolbox
+
+## 附加实验工具
+
+[喷雾物理约束识别工具](spray_physics/README.md)位于独立目录，包含中文界面、版本化算法、对照验证与项目报告。其数据和依赖与定速巡航工程分别管理。

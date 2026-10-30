@@ -1,0 +1,64 @@
+{
+  "tests_run": 16,
+  "failures": 0,
+  "errors": 0,
+  "checks": [
+    {
+      "check": "完整自动读取与识别",
+      "width": 512,
+      "height": 512,
+      "jets": 6,
+      "polarity": "bright",
+      "frames": 24,
+      "onset_frame": 6,
+      "ok": true,
+      "synthetic_only": true
+    },
+    {
+      "check": "完整自动读取与识别",
+      "width": 512,
+      "height": 512,
+      "jets": 6,
+      "polarity": "bright",
+      "frames": 24,
+      "onset_frame": 6,
+      "ok": true,
+      "synthetic_only": true
+    },
+    {
+      "check": "命令行批处理容错",
+      "success": 1,
+      "skipped_invalid": 1,
+      "ok": true
+    },
+    {
+      "check": "完整自动读取与识别",
+      "width": 640,
+      "height": 512,
+      "jets": 8,
+      "polarity": "dark",
+      "frames": 24,
+      "onset_frame": 6,
+      "ok": true,
+      "synthetic_only": true
+    },
+    {
+      "check": "完整自动读取与识别",
+      "width": 512,
+      "height": 512,
+      "jets": 6,
+      "polarity": "dark",
+      "frames": 34,
+      "onset_frame": 16,
+      "ok": true,
+      "synthetic_only": true
+    },
+    {
+      "check": "合成局部信号缺失",
+      "baseline_boundary_error_px": 71.0,
+      "constrained_boundary_error_px": 4.0,
+      "synthetic_only": true
+    }
+  ],
+  "note": "合成结果用于验证流程和约束，不能作为真实喷雾准确率。"
+}

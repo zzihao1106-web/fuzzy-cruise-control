@@ -16,6 +16,7 @@ from PIL import Image
 
 from spray_recognition import discover_sequence, main, optimize_boundary
 from recognition_core import EvidenceTracker
+from diagnose import analyze_jumps
 
 
 HERE = Path(__file__).resolve().parent
@@ -109,7 +110,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(summary["jet_count_from_image"], jets)
             self.assertEqual(summary["detected_signal_polarity"], "dark" if dark else "bright")
             self.assertIsInstance(summary["step_constraint_violations"], int)
-            self.assertEqual(summary["version"], "2.0.0")
+            self.assertEqual(summary["version"], (HERE / "VERSION").read_text(encoding="utf-8").strip())
             self.assertEqual(len(list((output / "envelope_masks").glob("*.png"))), 24+delay-5)
             self.assertEqual(len(summary["excluded_different_resolution_images"]), 1)
             self.assertTrue((output / "jet_metrics.csv").exists())
@@ -225,6 +226,18 @@ class V2RegressionTests(unittest.TestCase):
         residual[159:162, 215:295] = 15
         result = tracker.process(residual, np.full(360, 149.))
         self.assertLess(int(result.evidence[radius > 125].sum()), 10)
+
+
+class DiagnosticTests(unittest.TestCase):
+    def test_topology_change_is_distinct_from_jet_motion(self):
+        radii = np.array([[0., 100.], [100., 180.]])
+        events = analyze_jumps(radii, [True, True], [30, 0], [0], 50)
+        self.assertEqual(events[0]["review_hint"], "角向可见性出现或消失")
+        self.assertEqual(events[1]["review_hint"], "喷束方向前沿待核查")
+
+    def test_unknown_frame_is_not_treated_as_retraction(self):
+        events = analyze_jumps(np.array([[100.], [0.]]), [True, False], [0], [0], 50)
+        self.assertEqual(events, [])
 
 
 if __name__ == "__main__":

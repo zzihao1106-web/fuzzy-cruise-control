@@ -19,6 +19,8 @@ from scipy.optimize import least_squares
 from scipy.signal import find_peaks
 from recognition_core import EvidenceTracker
 
+APP_VERSION = Path(__file__).with_name("VERSION").read_text(encoding="utf-8").strip()
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -474,7 +476,7 @@ def main(config_path, overrides=None, frame_observer=None):
     jet_pairs = observed_pair[:, None] & (jet_fronts[1:] > 0) & (jet_fronts[:-1] > 0)
     negative = stats[:n_bg]
     summary = {
-        "version": "2.0.0", "frames": n_frames, "onset_frame": onset + 1, "jet_count_from_image": len(peaks),
+        "version": APP_VERSION, "frames": n_frames, "onset_frame": onset + 1, "jet_count_from_image": len(peaks),
         "unknown_frames": [i+1 for i, status in enumerate(statuses) if status.startswith("unknown")],
         "detected_signal_polarity": polarity,
         "jet_angles_deg_clockwise": (peaks * 360 / n_angles).tolist(), "max_front_step_px_per_frame": max_step,
