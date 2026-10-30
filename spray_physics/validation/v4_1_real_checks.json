@@ -1,0 +1,30 @@
+{
+  "empty_white_checks": [
+    {
+      "frame": 4,
+      "old_gain1_white_mean_gray": 0.7310414910316467,
+      "new_gain1_white_mean_gray": 0.028083553537726402,
+      "new_saved_white_mean_gray": 0.0,
+      "new_saved_white_p99_gray": 0.0
+    },
+    {
+      "frame": 5,
+      "old_gain1_white_mean_gray": 0.7215064764022827,
+      "new_gain1_white_mean_gray": 0.028028715401887894,
+      "new_saved_white_mean_gray": 0.0,
+      "new_saved_white_p99_gray": 0.0
+    }
+  ],
+  "short_jet_check": {
+    "strong_pixels": 1138,
+    "visible_above_5_gray": 1138,
+    "not_accuracy": true
+  },
+  "cleaned_boundary_hashes_match": 70,
+  "source_hashes_unchanged": 70,
+  "animation_frame_counts": {
+    "cleaned": 70,
+    "boundary": 70
+  },
+  "real_boundary_accuracy_available": false
+}

@@ -27,16 +27,19 @@ class SprayTool(tk.Tk):
         self.minsize(960, 680)
         self.config_data = json.loads((HERE / ("config.json" if (HERE / "config.json").exists() else "config.example.json")).read_text(encoding="utf-8"))
         self.config_data.update(source_xy=None, chamber_xy=None, chamber_axes_px=None, radial_bins=None, mm_per_pixel=None)
+        candidates = [HERE / "models" / name for name in (
+            "restore_spray_v4_1_alpha1.pt", "restore_spray_v4_alpha1.pt", "deep_spray_v3_alpha2.pt")]
+        default_checkpoint = next((str(path) for path in candidates if path.is_file()), "")
         self.variables = {key: tk.StringVar(value=value) for key, value in {
             "source_dir": "", "output_dir": "", "liquid_name": "柴油", "background_frames": "5", "fps": "10000",
             "known_diameter_mm": "60", "ambient_pressure_bar": "40", "threshold_gray": "10",
             "physics_weight": "0.14", "liquid_density_kg_m3": "", "injection_pressure_MPa_label": "140", "velocity_coefficient": "",
-            "deep_checkpoint": str(HERE / "models" / "restore_spray_v4_alpha1.pt") if (HERE / "models" / "restore_spray_v4_alpha1.pt").is_file() else (str(HERE / "models" / "deep_spray_v3_alpha2.pt") if (HERE / "models" / "deep_spray_v3_alpha2.pt").is_file() else ""),
+            "deep_checkpoint": default_checkpoint,
         }.items()}
         self.pressure_confirmed = tk.BooleanVar(value=False)
         self.consecutive = tk.BooleanVar(value=True)
         self.polarity = tk.StringVar(value="自动")
-        self.engine = tk.StringVar(value="V4先去白再识别" if (HERE / "models" / "restore_spray_v4_alpha1.pt").is_file() else "V2图像证据")
+        self.engine = tk.StringVar(value="V4先去白再识别" if default_checkpoint and Path(default_checkpoint).name.startswith("restore_") else "V2图像证据")
         self.loaded_source = None
         self.status = tk.StringVar(value="选择一个图像序列文件夹，加载预览并检查一次标定。")
         self.geometry_info = tk.StringVar(value="尚未加载图像")

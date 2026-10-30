@@ -13,9 +13,9 @@ import numpy as np
 import torch
 from PIL import Image
 
-from deep_data import prepare
+from deep_data import prepare, SpraySynthesizer
 from deep_model import BackgroundUNet
-from restore_model import ReferenceRestorer, restoration_loss
+from restore_model import ReferenceRestorer, OpticalRestorer, restoration_loss, optical_loss
 from restore_spray import boundary_from_cleaned, clean_input, digest, process, process_batch, train
 
 ROOT = Path(__file__).parent/"_test_tmp"
@@ -24,6 +24,75 @@ torch.set_num_threads(2)
 
 
 class RestorationTests(unittest.TestCase):
+    def test_physical_projection_preserves_visible_positive_changes(self):
+        model = OpticalRestorer(width=8, depth=2, physical_projection=True).eval()
+        x = torch.rand(1, 4, 32, 32)
+        z = model.decompose(x)
+        r, n = model(x)
+        torch.testing.assert_close(r+n+x[:, 1:2], x[:, :1])
+        background = (x[:, 1:2]+z["offset"]).clamp(0, 1)
+        self.assertTrue((r+1e-6 >= (x[:, :1]-background).clamp_min(0)).all())
+
+    def test_optical_synthesis_matches_mixing_equation(self):
+        with tempfile.TemporaryDirectory(dir=ROOT) as folder:
+            p = Path(folder)/"backgrounds.npz"
+            b = np.full((64, 64), 0.6, np.float32)
+            np.savez(p, pool=b[None], background=b, roi=np.ones_like(b, bool))
+            synth = SpraySynthesizer(p, seed=77, curriculum=True)
+            for _ in range(8):
+                x, _, target = synth.sample(optical=True)
+                reconstructed = (1-target["alpha"][0])*(x[1]+target["background_offset"][0])+target["foreground"][0]
+                self.assertLess(float(np.abs(reconstructed-x[0]).mean()), 0.02)
+                self.assertTrue((target["foreground"] <= target["alpha"]+1e-6).all())
+
+    def test_optical_layers_are_bounded_and_reconstruct(self):
+        model = OpticalRestorer(width=8, depth=2)
+        x = torch.rand(1, 4, 35, 47)
+        layers = model.decompose(x)
+        self.assertTrue((layers["foreground"] >= 0).all())
+        self.assertTrue((layers["foreground"] <= layers["alpha"]).all())
+        torch.testing.assert_close(layers["foreground"]+layers["background_contribution"], layers["reconstruction"])
+        r, n = model(x)
+        torch.testing.assert_close(r+n+x[:, 1:2], layers["reconstruction"])
+
+    def test_zero_contrast_does_not_make_zero_foreground_valid(self):
+        # B=F=0.7时观测不变，但alpha=0.6对应前景层0.42，不能把黑图当恢复正确。
+        x = torch.zeros(1, 4, 16, 16); x[:, :2] = 0.7
+        alpha = torch.full((1, 1, 16, 16), 0.6)
+        target = {"alpha": alpha, "foreground": alpha*0.7, "background_offset": alpha*0}
+        good = {"alpha_logits": torch.logit(alpha), "foreground": alpha*0.7, "offset": alpha*0, "reconstruction": x[:, :1]}
+        black = {"alpha_logits": torch.full_like(alpha, -20), "foreground": alpha*0, "offset": alpha*0, "reconstruction": x[:, :1]}
+        self.assertGreater(float(optical_loss(black, target, x)), float(optical_loss(good, target, x))+0.5)
+
+    def test_optical_training_bundle_and_saved_png_pipeline(self):
+        with tempfile.TemporaryDirectory(dir=ROOT) as folder:
+            p = Path(folder); source = p/"raw"; source.mkdir()
+            for i in range(4):
+                a = np.full((48, 64), 90, np.uint8)
+                if i >= 2:
+                    a[22:27, 30:48] = 140
+                Image.fromarray(a).save(source/f"{i+1:06d}.png")
+            cfg = {"source_dir": str(source), "background_frames": 2, "source_xy": [32, 24],
+                   "chamber_xy": [32, 24], "chamber_axes_px": [20, 20]}
+            config = p/"config.json"; config.write_text(json.dumps(cfg), encoding="utf-8")
+            prepare(source, cfg, p/"data", 64)
+            with contextlib.redirect_stdout(io.StringIO()):
+                train(argparse.Namespace(data=str(p/"data"), output=str(p/"train"), model="optical", baseline=None,
+                      steps=2, boundary_steps=2, batch=1, width=8, seed=5, lr=0.001, device="cpu"))
+                report = process(argparse.Namespace(config=str(config), checkpoint=str(p/"train/pipeline_best.pt"),
+                    input=None, output=str(p/"result"), size=64, device="cpu", reuse_geometry=False))
+            self.assertEqual(report["restore_kind"], "optical")
+            self.assertFalse(report["boundary"]["raw_images_read_by_boundary_stage"])
+            self.assertEqual(len(list((p/"result/restoration_unknown").glob("*.png"))), 4)
+            with contextlib.redirect_stdout(io.StringIO()):
+                train(argparse.Namespace(data=str(p/"data"), output=str(p/"projected_train"), model="optical", baseline=None,
+                      resume_cleaner=str(p/"train/cleaner_best.pt"), physical_projection=True, foreground_gain=1.0,
+                      steps=0, boundary_steps=2, batch=1, width=8, seed=5, lr=0.001, device="cpu"))
+                projected = process(argparse.Namespace(config=str(config), checkpoint=str(p/"projected_train/pipeline_best.pt"),
+                    input=None, output=str(p/"projected_result"), size=64, device="cpu", reuse_geometry=False))
+            self.assertTrue(projected["physical_projection"])
+            self.assertEqual(projected["fixed_display_gain"], 1)
+
     def test_reference_reconstruction_and_odd_size_gradient(self):
         model = ReferenceRestorer(width=8, depth=2)
         x = torch.rand(1, 4, 35, 47)
@@ -83,6 +152,8 @@ class RestorationTests(unittest.TestCase):
             self.assertFalse(summary["segmentation_mask_used_to_clean_image"])
             self.assertEqual(summary["boundary"]["frames"], 6)
             self.assertEqual(len(list((p/"result/cleaned_frames").glob("*.png"))), 6)
+            saved_cfg = json.loads((p/"result/运行配置.json").read_text(encoding="utf-8"))
+            self.assertEqual(Path(saved_cfg["output_dir"]).resolve(), (p/"result").resolve())
             with Image.open(p/"result/逐帧深度去白.gif") as im:
                 self.assertEqual(im.n_frames, 6)
             self.assertEqual(len(list(source.glob("*.png"))), 6)

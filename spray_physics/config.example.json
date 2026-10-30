@@ -38,5 +38,9 @@
   "max_completion_mm": 1.5,
   "liquid_name": "",
   "min_structure_px": 9,
-  "rim_structure_px": 21
+  "rim_structure_px": 21,
+  "injection_pressure_value_confirmed": true,
+  "injection_pressure_basis": null,
+  "nozzle_diameter_mm": 0.23,
+  "nozzle_diameter_confirmed": true
 }

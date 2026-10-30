@@ -1,0 +1,24 @@
+{
+  "version": "4.1.0-alpha1",
+  "frames": 70,
+  "reference_frames": 3,
+  "restore_kind": "optical",
+  "physical_projection": false,
+  "checkpoint_sha256": "51895d135401c88020e793054863e0fc6940905f6ebc71fad5801716ed7591f4",
+  "checkpoint_version": "4.1.0-alpha1",
+  "cleaner_step": 1000,
+  "boundary_step": 500,
+  "fixed_display_gain": 1.0,
+  "segmentation_mask_used_to_clean_image": false,
+  "boundary": {
+    "frames": 70,
+    "input_contract": "仅已保存去白PNG",
+    "empty_noise_level": 0.011764705882352941,
+    "raw_images_read_by_boundary_stage": false
+  },
+  "human_labels": 0,
+  "real_accuracy_available": false,
+  "seconds": 32.90759360000084,
+  "excluded_attachment_count": 1,
+  "restoration_meaning": "分层模型估计的前景贡献；低对比或重构冲突处单独标未知，不能当作直接测量"
+}

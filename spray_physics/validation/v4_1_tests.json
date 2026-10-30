@@ -1,0 +1,10 @@
+{
+  "restoration_tests_passed": 10,
+  "legacy_deep_tests_passed": 14,
+  "skipped": 0,
+  "gui_real_sequence_frames": 70,
+  "strict_clean_then_boundary": true,
+  "original_images_hash_checked": 70,
+  "real_human_labels": 0,
+  "real_accuracy_validated": false
+}

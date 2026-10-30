@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-RESTORE_VERSION = "4.0.0-alpha1"
+RESTORE_VERSION = "4.1.0-alpha1"
 
 
 class ChannelNorm(nn.Module):
@@ -67,7 +67,7 @@ class ReferenceRestorer(nn.Module):
         self.ending = nn.Conv2d(width, 1, 3, padding=1)
         nn.init.zeros_(self.ending.weight); nn.init.zeros_(self.ending.bias)
 
-    def forward(self, x):
+    def features(self, x):
         h, w = x.shape[-2:]
         factor = 2**self.spec["depth"]
         padded = F.pad(x, (0, (-w) % factor, 0, (-h) % factor), mode="replicate")
@@ -77,9 +77,60 @@ class ReferenceRestorer(nn.Module):
         z = self.middle(z)
         for up, block, skip in zip(self.ups, self.decoders, reversed(skips)):
             z = block(up(z)+skip)
-        nuisance = self.ending(z)[..., :h, :w].tanh()*self.spec["correction_limit"]
+        return z[..., :h, :w]
+
+    def forward(self, x):
+        nuisance = self.ending(self.features(x)).tanh()*self.spec["correction_limit"]
         restored = x[:, :1]-x[:, 1:2]-nuisance
         return restored, nuisance
+
+
+class OpticalRestorer(ReferenceRestorer):
+    """按I=(1-alpha)B+alpha F分层，前景层不受差分必为零的限制。"""
+    def __init__(self, width=16, depth=3, correction_limit=0.15, difference_gain=8.0, physical_projection=False):
+        super().__init__(width, depth, correction_limit)
+        self.spec["difference_gain"] = difference_gain
+        self.spec["physical_projection"] = physical_projection
+        self.ending = nn.Conv2d(width, 3, 3, padding=1)
+        nn.init.zeros_(self.ending.weight); nn.init.zeros_(self.ending.bias)
+        with torch.no_grad():
+            self.ending.bias[0] = -3
+
+    def decompose(self, x):
+        scaled = torch.cat([x[:, :2], x[:, 2:]*self.spec["difference_gain"]], 1)
+        z = self.ending(self.features(scaled))
+        alpha = z[:, :1].sigmoid()
+        foreground = alpha*z[:, 1:2].sigmoid()
+        offset = z[:, 2:3].tanh()*self.spec["correction_limit"]
+        background = (x[:, 1:2]+offset).clamp(0, 1)
+        background_contribution = (1-alpha)*background
+        # 由测得的图像约束背景贡献，保留清晰的正变化与原图纹理。
+        projected_background = torch.minimum(background_contribution, x[:, :1])
+        projected_foreground = (x[:, :1]-projected_background).clamp(0, 1)
+        return {"foreground": foreground, "alpha": alpha, "alpha_logits": z[:, :1],
+                "offset": offset, "background_contribution": background_contribution,
+                "reconstruction": foreground+background_contribution,
+                "projected_foreground": projected_foreground, "projected_background": projected_background}
+
+    def forward(self, x):
+        layers = self.decompose(x)
+        if self.spec["physical_projection"]:
+            return layers["projected_foreground"], layers["projected_background"]-x[:, 1:2]
+        return layers["foreground"], layers["background_contribution"]-x[:, 1:2]
+
+
+def optical_loss(layers, target, inputs):
+    foreground = target["alpha"] > 0.05
+    def balanced(error):
+        a = (error*foreground).sum()/foreground.sum().clamp_min(1)
+        b = (error*~foreground).sum()/(~foreground).sum().clamp_min(1)
+        return a+b
+    alpha = F.binary_cross_entropy_with_logits(layers["alpha_logits"], target["alpha"], reduction="none")
+    appearance = balanced((layers["foreground"]-target["foreground"]).abs())
+    alpha_loss = balanced(alpha)
+    reconstruction = F.l1_loss(layers["reconstruction"], inputs[:, :1])
+    background = F.l1_loss(layers["offset"], target["background_offset"])
+    return appearance*2+alpha_loss*0.5+reconstruction+background*0.5
 
 
 def restoration_loss(restored, target, semantic):

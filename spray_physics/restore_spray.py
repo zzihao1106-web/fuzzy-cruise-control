@@ -70,6 +70,9 @@ def evaluate_restorer(model, data, source, device, seed=319871, batches=6):
 
 
 def train(args):
+    if getattr(args, "model", "residual") == "optical":
+        from optical_training import train_optical
+        return train_optical(args)
     torch, device = runtime(args.device)
     from restore_model import ReferenceRestorer, RESTORE_VERSION, restoration_loss
     from deep_model import BackgroundUNet, supervised_loss
@@ -174,17 +177,18 @@ def train(args):
 
 def load_bundle(path, device):
     import torch
-    from restore_model import ReferenceRestorer
+    from restore_model import ReferenceRestorer, OpticalRestorer
     from deep_model import BackgroundUNet
     bundle = torch.load(path, map_location="cpu", weights_only=True)
-    restorer = ReferenceRestorer(**bundle["restorer_spec"]).to(device).eval()
+    kind = bundle.get("restore_kind", "residual")
+    restorer = (OpticalRestorer if kind == "optical" else ReferenceRestorer)(**bundle["restorer_spec"]).to(device).eval()
     restorer.load_state_dict(bundle["restorer"])
     boundary = BackgroundUNet(**bundle["boundary_spec"]).to(device).eval()
     boundary.load_state_dict(bundle["boundary"])
     return restorer, boundary, bundle
 
 
-def boundary_from_cleaned(folder, output, model, cfg, device):
+def boundary_from_cleaned(folder, output, model, cfg, device, uncertainty_folder=None):
     """这个入口没有原图目录或背景参数，必须从已落盘的去白图开始。"""
     import torch
     from spray_recognition import discover_sequence
@@ -208,6 +212,10 @@ def boundary_from_cleaned(folder, output, model, cfg, device):
             p = model(torch.from_numpy(gray_channels(im)[None]).to(device))[-1].sigmoid().cpu().numpy()[0, 0]
         mask = source_connected((p > 0.5) & small_roi, source, size*0.065)
         unknown = ((p > 0.2) & (p < 0.8) | ((p > 0.5) & (im <= floor))) & small_roi
+        if uncertainty_folder:
+            uncertainty_path = Path(uncertainty_folder)/path.name
+            prior_unknown = crop_resize(read_gray(uncertainty_path), bounds, size, True) > 0.5
+            unknown |= prior_unknown & (p > 0.2)
         valid = int(((im > floor) & small_roi).sum()) >= max(12, int(small_roi.sum()*0.0005))
         if not valid:
             unknown |= mask; mask[:] = False
@@ -221,7 +229,8 @@ def boundary_from_cleaned(folder, output, model, cfg, device):
             full[y0:y1, x0:x1] = cv2.resize(array.astype(np.float32), (x1-x0, y1-y0), interpolation=cv2.INTER_NEAREST)
             Image.fromarray(np.uint8(full*255)).save(output/name/f"{index:06d}.png")
         records.append({"frame": index, "input_file": path.name, "cleaned_input_sha256": digest(path),
-                        "measurement_valid": valid, "mask_pixels_processing": int(mask.sum()), "unknown_pixels": int(unknown.sum())})
+                        "measurement_valid": valid, "mask_pixels_processing": int(mask.sum()), "unknown_pixels": int(unknown.sum()),
+                        "restoration_uncertainty_sha256": digest(uncertainty_path) if uncertainty_folder else None})
     animation[0].save(output/"去白后边界动画.gif", save_all=True, append_images=animation[1:], duration=100, loop=0, disposal=2)
     write_json(output/"boundary_inputs.json", records)
     return {"frames": len(paths), "input_contract": "仅已保存去白PNG", "empty_noise_level": floor,
@@ -238,6 +247,7 @@ def process(args):
     out = Path(args.output or cfg["output_dir"])
     if out.resolve() == Path(folder).resolve():
         raise ValueError("结果目录不能与原图目录相同。")
+    cfg["output_dir"] = str(out.resolve())
     out.mkdir(parents=True, exist_ok=True)
     paths, excluded = discover_sequence(folder)
     count = int(cfg.get("background_frames", 5))
@@ -251,8 +261,15 @@ def process(args):
     bounds, roi, static = crop_geometry(reference.shape, cfg)
     x0, y0, x1, y1 = bounds
     restorer, boundary, bundle = load_bundle(args.checkpoint, device)
+    optical = bundle.get("restore_kind") == "optical"
+    reference_stack = np.stack([read_gray(p) for p in paths[:fit_count]])
+    noise_map = np.median(np.abs(reference_stack-reference), axis=0)*1.4826+2/255
+    small_noise = crop_resize(noise_map, bounds, args.size)
     for name in ("cleaned_frames", "removed_background", "comparison"):
         (out/name).mkdir(exist_ok=True)
+    if optical:
+        for name in ("opacity_frames", "restoration_unknown"):
+            (out/name).mkdir(exist_ok=True)
     Image.fromarray(np.uint8(reference*255)).save(out/"原始背景参考.png")
     frames, comparisons, records = [], [], []
     start = time.perf_counter()
@@ -261,12 +278,29 @@ def process(args):
         corrected, spec = correct_photometry(original, reference, static)
         image, bg = crop_resize(original, bounds, args.size), crop_resize(corrected, bounds, args.size)
         with torch.inference_mode():
-            signed, nuisance = restorer(torch.from_numpy(channels(image, bg)[None]).to(device))
+            inputs = torch.from_numpy(channels(image, bg)[None]).to(device)
+            if optical:
+                layers = restorer.decompose(inputs)
+                projected = bool(restorer.spec.get("physical_projection"))
+                signed = layers["projected_foreground"] if projected else layers["foreground"]
+                background_contribution = layers["projected_background"] if projected else layers["background_contribution"]
+                nuisance = background_contribution-inputs[:, 1:2]
+            else:
+                signed, nuisance = restorer(inputs)
         signed = signed[0, 0].float().cpu().numpy()
         nuisance = nuisance[0, 0].float().cpu().numpy()
         cleaned = clean_input(signed, bundle["gain"])
         small_roi = crop_resize(roi, bounds, args.size, True) > 0.5
         cleaned *= small_roi
+        if optical:
+            alpha = layers["alpha"][0, 0].cpu().numpy()
+            reconstruction = layers["reconstruction"][0, 0].cpu().numpy()
+            uncertain = (alpha > 0.15) & ((np.abs(image-bg) < np.maximum(0.025, small_noise*3)) |
+                        (np.abs(reconstruction-image) > np.maximum(0.04, small_noise*3))) & small_roi
+            for directory, field in (("opacity_frames", alpha*small_roi), ("restoration_unknown", uncertain)):
+                plane = np.zeros_like(original)
+                plane[y0:y1, x0:x1] = cv2.resize(field.astype(np.float32), (x1-x0, y1-y0), interpolation=cv2.INTER_NEAREST if directory == "restoration_unknown" else cv2.INTER_LINEAR)
+                Image.fromarray(np.uint8(np.rint(plane*255))).save(out/directory/f"{index:06d}.png")
         # 保存的是恢复网络的连续灰度输出，没有用边界或喷雾分割掩膜筛图。
         full = np.zeros_like(original)
         full[y0:y1, x0:x1] = cv2.resize(cleaned, (x1-x0, y1-y0), interpolation=cv2.INTER_LINEAR)
@@ -277,7 +311,8 @@ def process(args):
         removed[y0:y1, x0:x1] = cv2.resize(np.clip(bg+nuisance, 0, 1), (x1-x0, y1-y0))
         Image.fromarray(np.uint8(removed*255)).save(out/"removed_background"/f"{index:06d}.png")
         frame = Image.fromarray(np.uint8(np.rint(cleaned*255))).convert("RGB")
-        draw = ImageDraw.Draw(frame); draw.text((8, 8), f"{index:03d} 深度去白", font=font(17), fill="white")
+        display_label = "分层前景估计" if optical else "深度去白"
+        draw = ImageDraw.Draw(frame); draw.text((8, 8), f"{index:03d} {display_label}", font=font(17), fill="white")
         frames.append(frame.resize((480, 480)))
         compare = Image.new("RGB", (960, 510), "black")
         compare.paste(Image.fromarray(np.uint8(image*255)).convert("RGB").resize((480, 480)), (0, 30))
@@ -296,16 +331,19 @@ def process(args):
     comparisons[0].save(out/"原图与去白对照.gif", save_all=True, append_images=comparisons[1:], duration=100, loop=0, disposal=2)
     # 先结束全部清理并落盘，再启动独立的边界阶段。
     print("全部去白PNG已保存，现在仅从这些PNG捕捉边界。", flush=True)
-    boundary_summary = boundary_from_cleaned(out/"cleaned_frames", out/"boundary", boundary, cfg, device)
+    boundary_summary = boundary_from_cleaned(out/"cleaned_frames", out/"boundary", boundary, cfg, device,
+                                            out/"restoration_unknown" if optical else None)
     write_json(out/"frame_mapping.json", records)
     write_json(out/"运行配置.json", cfg)
     summary = {"version": RESTORE_VERSION, "frames": len(paths), "reference_frames": fit_count,
+               "restore_kind": bundle.get("restore_kind", "residual"),
+               "physical_projection": bool(bundle["restorer_spec"].get("physical_projection")),
                "checkpoint_sha256": digest(args.checkpoint), "checkpoint_version": bundle["version"],
                "cleaner_step": bundle["cleaner_step"], "boundary_step": bundle["boundary_step"],
                "fixed_display_gain": bundle["gain"], "segmentation_mask_used_to_clean_image": False,
                "boundary": boundary_summary, "human_labels": 0, "real_accuracy_available": False,
                "seconds": time.perf_counter()-start, "excluded_attachment_count": len(excluded),
-               "restoration_meaning": "保留增亮/变暗的可观测喷雾贡献，黑底为固定背景剔除结果；未恢复不可观测纹理"}
+               "restoration_meaning": "分层模型估计的前景贡献；低对比或重构冲突处单独标未知，不能当作直接测量" if optical else "保留增亮/变暗的可观测喷雾贡献，黑底为固定背景剔除结果；未恢复不可观测纹理"}
     write_json(out/"restoration_summary.json", summary)
     print(json.dumps(summary, ensure_ascii=False), flush=True)
     return summary
@@ -342,6 +380,26 @@ def process_batch(args):
         raise RuntimeError("没有成功处理的图像序列。")
 
 
+def evaluate(args):
+    from optical_training import evaluate_optical
+    _, device = runtime(args.device)
+    restorer, _, bundle = load_bundle(args.checkpoint, device)
+    if bundle.get("restore_kind") != "optical":
+        raise ValueError("此评估针对分层前景；旧残差模型请通过--baseline提供。")
+    if args.batches < 1:
+        raise ValueError("评估批次数必须为正。")
+    data = Path(args.data)
+    manifest = json.loads((data/"manifest.json").read_text(encoding="utf-8"))
+    baseline = load_bundle(args.baseline, device)[0] if args.baseline else None
+    metrics = evaluate_optical(restorer, data, manifest["source_normalized"], device,
+                               seed=args.seed, batches=args.batches, baseline=baseline)
+    metrics.update(checkpoint_sha256=digest(args.checkpoint), seed=args.seed,
+                   baseline_sha256=digest(args.baseline) if args.baseline else None,
+                   real_accuracy_available=False)
+    write_json(args.output, metrics)
+    print(json.dumps(metrics, ensure_ascii=False), flush=True)
+
+
 def main():
     p = argparse.ArgumentParser(description="先深度去白，再从去白图识别边界")
     sub = p.add_subparsers(dest="command", required=True)
@@ -350,6 +408,11 @@ def main():
     t.add_argument("--steps", type=int, default=800); t.add_argument("--boundary-steps", type=int, default=500)
     t.add_argument("--batch", type=int, default=4); t.add_argument("--width", type=int, default=16)
     t.add_argument("--seed", type=int, default=20261101); t.add_argument("--lr", type=float, default=0.001)
+    t.add_argument("--model", choices=["residual", "optical"], default="optical")
+    t.add_argument("--baseline", help="可选旧恢复权重，用于相同合成图像的对照")
+    t.add_argument("--resume-cleaner", help="复用已训练分层恢复器，只训练处理图边界模块")
+    t.add_argument("--foreground-gain", type=float, default=None, help="固定前景显示增益，边界训练与推理共用")
+    t.add_argument("--physical-projection", action="store_true", help="用原图约束背景贡献并保留清晰纹理")
     t.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     t = sub.add_parser("process")
     t.add_argument("--config", required=True); t.add_argument("--checkpoint", required=True)
@@ -357,9 +420,16 @@ def main():
     t.add_argument("--reuse-geometry", action="store_true")
     t.add_argument("--batch", action="store_true")
     t.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
+    t = sub.add_parser("evaluate")
+    t.add_argument("--data", required=True); t.add_argument("--checkpoint", required=True)
+    t.add_argument("--baseline"); t.add_argument("--output", required=True)
+    t.add_argument("--seed", type=int, default=984203); t.add_argument("--batches", type=int, default=16)
+    t.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     args = p.parse_args()
     if args.command == "train":
         train(args)
+    elif args.command == "evaluate":
+        evaluate(args)
     elif args.batch:
         process_batch(args)
     else:

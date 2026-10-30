@@ -116,7 +116,7 @@ class SpraySynthesizer:
     def smooth_noise(self, scale):
         return cv2.resize(self.rng.normal(size=(scale, scale)).astype(np.float32), (self.size, self.size), interpolation=cv2.INTER_CUBIC)
 
-    def sample(self, force_empty=False, restoration=False):
+    def sample(self, force_empty=False, restoration=False, optical=False):
         rng, n = self.rng, self.size
         use_procedural = self.procedural_only or rng.random() < 0.4
         if use_procedural:
@@ -169,6 +169,24 @@ class SpraySynthesizer:
         if rng.random() < 0.15:
             scatter = 0.0
         texture = np.clip(0.8 + 0.12*self.smooth_noise(36) + 0.08*self.smooth_noise(10), 0.3, 1.2)
+        if optical:
+            # 亮背景可与喷雾前景亮度接近，此时差分变小但前景层并未消失。
+            alpha = np.clip(mask*texture*opacity, 0, 0.98).astype(np.float32)
+            bright = current_bg[self.roi & (current_bg > 0.45)]
+            appearance = rng.uniform(0.25, 0.90)
+            if bright.size and rng.random() < 0.65:
+                appearance = float(np.median(bright))+rng.uniform(-0.04, 0.04)
+            foreground = np.clip(appearance+0.04*self.smooth_noise(30), 0.10, 0.98)
+            emission = alpha*foreground
+            observation = (1-alpha)*current_bg+emission
+            image = np.clip(observation+rng.normal(0, rng.uniform(0.002, 0.009), b.shape), 0, 1).astype(np.float32)
+            hard = (alpha > 0.08).astype(np.float32)
+            edge = cv2.morphologyEx(hard, cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8))
+            ambiguity = hard*(np.abs(observation-current_bg) < 0.025)
+            target = np.stack([hard, edge, ambiguity]).astype(np.float32)
+            layers = {"alpha": alpha[None], "foreground": emission[None].astype(np.float32),
+                      "background_offset": (current_bg-b_ref)[None].astype(np.float32)}
+            return channels(image, b_ref), target, layers
         signal = mask*texture*(scatter-opacity*current_bg)
         if self.curriculum:
             # 人工制造白斑遮断；保持潜在掩膜，并把不可见性作为辅助目标。

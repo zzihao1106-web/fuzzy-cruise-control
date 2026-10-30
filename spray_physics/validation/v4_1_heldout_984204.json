@@ -1,0 +1,21 @@
+{
+  "foreground_mae": 0.06755136698484421,
+  "background_mae": 0.006419107783585787,
+  "low_contrast_foreground_mae": 0.07911381125450134,
+  "low_contrast_recall_above_0_025": 0.9529380503009149,
+  "low_contrast_pixels": 139242,
+  "foreground_energy_ratio": 1.1227972507476807,
+  "alpha_mae": 0.023811688646674156,
+  "contrast_baseline_low_contrast_mae": 0.18849503993988037,
+  "selection_score_lower_is_better": 0.1659225015901029,
+  "synthetic_only": true,
+  "target_definition": "已知合成成像模型中的alpha乘前景层",
+  "reconstruction_mae": 0.009434202685952187,
+  "physical_projection": false,
+  "old_residual_model_low_contrast_mae": 0.18844322860240936,
+  "old_residual_model_low_contrast_energy_ratio": 0.061701707541942596,
+  "checkpoint_sha256": "51895d135401c88020e793054863e0fc6940905f6ebc71fad5801716ed7591f4",
+  "seed": 984204,
+  "baseline_sha256": "9f77934741e66860ee34dfe16d7f7db56ea520071a6a3d505880b1d9370befd9",
+  "real_accuracy_available": false
+}

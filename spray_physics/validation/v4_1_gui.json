@@ -1,0 +1,7 @@
+{
+  "gui_full_sequence_passed": true,
+  "frames": 70,
+  "restore_kind": "optical",
+  "display_gain": 1.0,
+  "raw_input_to_boundary": false
+}
