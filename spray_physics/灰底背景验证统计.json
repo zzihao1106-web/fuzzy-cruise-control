@@ -1,0 +1,10 @@
+{
+  "estimated_base_gray_0_255": 69.63337630033493,
+  "surface_std_original": 34.6293830871582,
+  "surface_std_textured": 1.7578074932098389,
+  "surface_std_template": 0.0,
+  "nozzle_core_radius_px": 22.2456,
+  "nozzle_pixels_preserved": true,
+  "ring_geometry_preserved_but_illumination_normalized": true,
+  "template_is_estimated_reference_not_measured_texture": true
+}
