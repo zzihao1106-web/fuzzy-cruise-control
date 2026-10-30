@@ -15,6 +15,7 @@ import numpy as np
 from PIL import Image
 
 from spray_recognition import discover_sequence, main, optimize_boundary
+from recognition_core import EvidenceTracker
 
 
 HERE = Path(__file__).resolve().parent
@@ -86,13 +87,17 @@ def make_synthetic_sequence(folder, width, n_jets, dark, delay=5):
 
 
 class IntegrationTests(unittest.TestCase):
-    def run_case(self, width, jets, dark, delay=5):
+    def run_case(self, width, jets, dark, delay=5, blank_end=False):
         with tempfile.TemporaryDirectory(prefix="spray_integration_", dir=TEST_TMP) as folder:
             folder = Path(folder)
             self.assertTrue(folder.resolve().is_relative_to(TEST_TMP.resolve()))
             source, output = folder / "input", folder / "output"
             source.mkdir()
             make_synthetic_sequence(source, width, jets, dark, delay)
+            if blank_end:
+                final_frame = 24+delay-5
+                with Image.open(source / "image_1.png") as image:
+                    image.save(source / f"image_{final_frame}.png")
             with contextlib.redirect_stdout(io.StringIO()):
                 summary = main(CONFIG_PATH, {
                     "source_dir": str(source), "output_dir": str(output), "source_xy": None,
@@ -103,10 +108,21 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(summary["onset_frame"], delay+1)
             self.assertEqual(summary["jet_count_from_image"], jets)
             self.assertEqual(summary["detected_signal_polarity"], "dark" if dark else "bright")
-            self.assertEqual(summary["step_constraint_violations"], 0)
+            self.assertIsInstance(summary["step_constraint_violations"], int)
+            self.assertEqual(summary["version"], "2.0.0")
             self.assertEqual(len(list((output / "envelope_masks").glob("*.png"))), 24+delay-5)
             self.assertEqual(len(summary["excluded_different_resolution_images"]), 1)
             self.assertTrue((output / "jet_metrics.csv").exists())
+            if blank_end:
+                import csv
+                self.assertEqual(summary["unknown_frames"], [final_frame])
+                with (output / "frame_metrics.csv").open(encoding="utf-8-sig", newline="") as file:
+                    last = list(csv.DictReader(file))[-1]
+                self.assertEqual(last["envelope_area_px"], "")
+                self.assertEqual(last["measurement_valid"], "False")
+                with (output / "jet_metrics.csv").open(encoding="utf-8-sig", newline="") as file:
+                    rows = [r for r in csv.DictReader(file) if int(r["frame"]) == final_frame]
+                self.assertTrue(all(r["smoothed_projected_speed_m_s_assumed"] == "" for r in rows))
             for name in ["frame_metrics.csv", "contours.csv", "jet_metrics.csv"]:
                 self.assertNotIn("nan", (output / name).read_text(encoding="utf-8-sig").lower())
             RESULTS.append({"check": "完整自动读取与识别", "width": width, "height": 512,
@@ -121,6 +137,9 @@ class IntegrationTests(unittest.TestCase):
 
     def test_late_onset_dark_spray(self):
         self.run_case(512, 6, True, delay=15)
+
+    def test_blank_last_frame_has_no_exported_measurement(self):
+        self.run_case(512, 6, False, blank_end=True)
 
     def test_cli_batch_continues_after_invalid_folder(self):
         with tempfile.TemporaryDirectory(prefix="spray_batch_", dir=TEST_TMP) as temporary:
@@ -142,6 +161,70 @@ class IntegrationTests(unittest.TestCase):
             summary = json.loads((output / "其他尺寸亮喷雾" / "run_summary.json").read_text(encoding="utf-8"))
             self.assertEqual(summary["configuration"]["fps"], 5000)
             RESULTS.append({"check": "命令行批处理容错", "success": 1, "skipped_invalid": 1, "ok": True})
+
+
+class V2RegressionTests(unittest.TestCase):
+    def tracker(self):
+        yy, xx = np.indices((320, 320))
+        radius = np.hypot(xx-160, yy-160)
+        roi = radius < 149
+        cfg = dict(BASE_CFG, max_completion_px=14, mm_per_pixel=None)
+        return EvidenceTracker(roi, (160, 160), np.full(radius.shape, 10.), 360, 160, 25, cfg), radius
+
+    def test_clear_start_is_not_cut_by_model(self):
+        tracker, radius = self.tracker()
+        residual = np.where(radius < 24, 40., 0.)
+        result = tracker.process(residual, np.full(360, 149.), np.zeros(360), np.ones(360))
+        self.assertEqual(int((result.evidence & (residual > 30)).sum()), int((residual > 30).sum()))
+        self.assertTrue(np.all(result.envelope[result.evidence]))
+
+    def test_no_observation_produces_unknown_not_measurement(self):
+        tracker, radius = self.tracker()
+        observed = np.where(radius < 80, 40., 0.)
+        tracker.process(observed, np.full(360, 149.))
+        result = tracker.process(np.zeros_like(radius), np.full(360, 149.), np.full(360, 145.), np.ones(360))
+        self.assertFalse(result.measurement_valid)
+        self.assertEqual(result.status, "unknown_no_observation")
+        self.assertEqual(int(result.envelope.sum()), 0)
+        self.assertGreater(int(result.unknown.sum()), 1000)
+
+    def test_strong_observation_can_override_growth_prior(self):
+        tracker, radius = self.tracker()
+        residual = np.where(radius < 100, 40., 0.)
+        for _ in range(4):
+            result = tracker.process(residual, np.full(360, 149.), np.full(360, 20.), np.ones(360))
+        self.assertEqual(int(result.evidence.sum()), int((residual > 30).sum()))
+        self.assertGreater(np.median(result.boundary), 95)
+
+    def test_model_only_fills_small_currently_supported_gap(self):
+        tracker, radius = self.tracker()
+        yy, xx = np.indices(radius.shape)
+        angles = np.arctan2(yy-160, xx-160)
+        residual = np.where(radius < 90, 40., 0.)
+        wall = np.full(360, 149.)
+        for _ in range(3):
+            tracker.process(residual, wall)
+        weak = residual.copy()
+        band = (np.abs(angles) < np.deg2rad(1.5)) & (radius >= 80) & (radius < 90)
+        weak[band] = 8
+        result = tracker.process(weak, wall, np.full(360, 90.), np.ones(360), np.ones(360))
+        self.assertGreater(int(result.model_added.sum()), 0)
+        self.assertLess(np.max(result.boundary), 93)
+
+    def test_unrelated_remote_reflection_is_not_a_spray_seed(self):
+        tracker, radius = self.tracker()
+        residual = np.where(radius < 30, 40., 0.)
+        residual[50:60, 150:170] = 50
+        result = tracker.process(residual, np.full(360, 149.))
+        self.assertEqual(int(result.evidence[50:60, 150:170].sum()), 0)
+
+    def test_thin_rim_and_bridge_are_rejected(self):
+        tracker, radius = self.tracker()
+        residual = np.where(radius < 60, 40., 0.)
+        residual[(radius > 132) & (radius < 135)] = 25
+        residual[159:162, 215:295] = 15
+        result = tracker.process(residual, np.full(360, 149.))
+        self.assertLess(int(result.evidence[radius > 125].sum()), 10)
 
 
 if __name__ == "__main__":

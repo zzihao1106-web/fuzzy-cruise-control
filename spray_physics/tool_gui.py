@@ -22,13 +22,13 @@ HERE = Path(__file__).resolve().parent
 class SprayTool(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("喷雾物理约束识别工具 V1")
+        self.title("喷雾物理约束识别工具 V2")
         self.geometry(f"{min(1220, self.winfo_screenwidth()-80)}x{min(880, self.winfo_screenheight()-100)}")
         self.minsize(960, 680)
         self.config_data = json.loads((HERE / ("config.json" if (HERE / "config.json").exists() else "config.example.json")).read_text(encoding="utf-8"))
         self.config_data.update(source_xy=None, chamber_xy=None, chamber_axes_px=None, radial_bins=None, mm_per_pixel=None)
         self.variables = {key: tk.StringVar(value=value) for key, value in {
-            "source_dir": "", "output_dir": "", "background_frames": "5", "fps": "10000",
+            "source_dir": "", "output_dir": "", "liquid_name": "柴油", "background_frames": "5", "fps": "10000",
             "known_diameter_mm": "60", "ambient_pressure_bar": "40", "threshold_gray": "10",
             "physics_weight": "0.14", "liquid_density_kg_m3": "", "injection_pressure_MPa_label": "140", "velocity_coefficient": "",
         }.items()}
@@ -61,7 +61,8 @@ class SprayTool(tk.Tk):
             ttk.Button(paths, text="选择…", command=lambda k=key: self.browse(k)).grid(row=row, column=2)
         paths.columnconfigure(1, weight=1)
         quick = ttk.Frame(outer); quick.pack(fill="x", pady=(8, 0))
-        ttk.Button(quick, text="载入当前60mm示例", command=lambda: self.load_settings(HERE / "config.json")).pack(side="left")
+        ttk.Button(quick, text="载入本机60mm示例", command=lambda: self.load_settings(HERE / "config.json"),
+                   state="normal" if (HERE / "config.json").exists() else "disabled").pack(side="left")
         ttk.Button(quick, text="加载设置…", command=self.load_settings).pack(side="left", padx=6)
         ttk.Button(quick, text="保存设置…", command=self.save_settings).pack(side="left")
         middle = ttk.Frame(outer); middle.pack(fill="both", expand=True, pady=10)
@@ -75,7 +76,7 @@ class SprayTool(tk.Tk):
         settings_window = setting_canvas.create_window((0, 0), window=settings, anchor="nw", width=285)
         settings.bind("<Configure>", lambda event: setting_canvas.configure(scrollregion=setting_canvas.bbox("all")))
         setting_canvas.bind("<Configure>", lambda event: setting_canvas.itemconfigure(settings_window, width=event.width))
-        fields = [("background_frames", "起喷前背景帧数"), ("fps", "采样率（帧/秒）"),
+        fields = [("liquid_name", "喷射液体（工况说明）"), ("background_frames", "起喷前背景帧数"), ("fps", "采样率（帧/秒）"),
                   ("known_diameter_mm", "标定圆直径（mm，可留空）"), ("ambient_pressure_bar", "环境背压（bar）"),
                   ("threshold_gray", "图像变化阈值（灰度）"), ("physics_weight", "增长模型权重"),
                   ("liquid_density_kg_m3", "液体密度（kg/m³，可留空）"),
@@ -83,8 +84,8 @@ class SprayTool(tk.Tk):
         for row, (key, label) in enumerate(fields):
             ttk.Label(settings, text=label).grid(row=row*2, column=0, sticky="w", pady=(6, 0))
             ttk.Entry(settings, textvariable=self.variables[key], width=30).grid(row=row*2+1, column=0, sticky="ew")
-        ttk.Checkbutton(settings, text="喷射压力及压力基准已确认", variable=self.pressure_confirmed).grid(row=18, column=0, sticky="w", pady=7)
-        ttk.Label(settings, text="密度、尺寸、Cv与压力齐全时，\n启用伯努利速度上界。\n绿色为图像证据；橙色为推断。", foreground="#555555").grid(row=19, column=0, sticky="w", pady=6)
+        ttk.Checkbutton(settings, text="喷射压力及压力基准已确认", variable=self.pressure_confirmed).grid(row=2*len(fields), column=0, sticky="w", pady=7)
+        ttk.Label(settings, text="密度、尺寸、Cv与压力齐全时，\n启用伯努利速度上界。\n绿色=证据；橙色=包络；紫色=未知。", foreground="#555555").grid(row=2*len(fields)+1, column=0, sticky="w", pady=6)
         right = ttk.Frame(middle); right.pack(side="left", fill="both", expand=True)
         controls = ttk.Frame(right); controls.pack(fill="x")
         ttk.Button(controls, text="加载 / 自动估计", command=self.load_preview).pack(side="left", padx=(0, 5))
@@ -123,7 +124,7 @@ class SprayTool(tk.Tk):
         cfg = dict(self.config_data)
         for key, var in self.variables.items():
             value = var.get().strip()
-            if key in {"source_dir", "output_dir"}:
+            if key in {"source_dir", "output_dir", "liquid_name"}:
                 cfg[key] = value
             else:
                 cfg[key] = float(value) if value else None

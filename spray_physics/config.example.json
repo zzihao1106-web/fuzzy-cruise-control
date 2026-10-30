@@ -33,5 +33,10 @@
     30,
     50,
     70
-  ]
+  ],
+  "max_completion_px": 14,
+  "max_completion_mm": 1.5,
+  "liquid_name": "",
+  "min_structure_px": 9,
+  "rim_structure_px": 21
 }

@@ -1,0 +1,10 @@
+{
+  "version": "2.0.0",
+  "gui_launch": true,
+  "sample_load": true,
+  "liquid_metadata": "柴油",
+  "run_button_to_engine": true,
+  "frames": 70,
+  "runtime_seconds": 30.5,
+  "requested_height": 768
+}
