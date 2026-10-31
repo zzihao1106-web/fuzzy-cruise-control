@@ -1,0 +1,103 @@
+{
+  "version": "5.0.0-alpha1",
+  "training": {
+    "version": "5.0.0-alpha1",
+    "steps": 1000,
+    "best_step": 1000,
+    "batch": 4,
+    "size": 256,
+    "seed": 20261031,
+    "learning_rate": 0.0015,
+    "parameters": 408915,
+    "seconds": 221.79228970000003,
+    "human_labels": 0,
+    "real_accuracy_available": false,
+    "heldout": {
+      "foreground_mae": 0.02181007220319271,
+      "background_mae": 0.004983707515802921,
+      "weak_foreground_mae": 0.03773436577083892,
+      "static_replacement_foreground_mae": 0.0794386476476131,
+      "alpha_mae": 0.02491148825113972,
+      "synthetic_only": true,
+      "samples": 48,
+      "selection_score": 0.06951185300563748
+    },
+    "context": "前一帧、当前帧、后一帧；离线处理，非因果实时模型",
+    "training": "三帧程序合成光学混合；单段真实空背景用于参考，不作有喷雾真值"
+  },
+  "real_sequence": {
+    "version": "5.0.0-alpha1",
+    "frames": 70,
+    "fit_background_frames": 3,
+    "heldout_empty_frames": [
+      4,
+      5
+    ],
+    "checkpoint_step": 1000,
+    "checkpoint_sha256": "d419b71f1ed9f9445dc99209ff7d675402ef726382782e43c6839d82aa96584f",
+    "size": 256,
+    "model_input": "前帧、当前帧、后帧、原背景、灰底参考及差分通道",
+    "equation": "J=I-T*(B_lit-B_gray)，T由网络及成像范围约束共同估计",
+    "network_response_calibrated_on_empty_reference": true,
+    "nozzle_core_preserved": true,
+    "boundary": {
+      "frames": 70,
+      "raw_images_read_by_boundary_stage": false,
+      "input_contract": "saved_gray_scene_png_only",
+      "human_labels": 0,
+      "empty_frame_false_positive_pixels": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "quantitative_measurement_valid": false,
+      "reason": "恢复与边界均未通过真实标注精度验证；紫色不作为确定测量"
+    },
+    "human_labels": 0,
+    "real_accuracy_available": false,
+    "empty_surface_std_gray": [
+      2.6916663646698,
+      2.7046656608581543,
+      2.692467212677002,
+      2.9350345134735107,
+      2.9029154777526855
+    ],
+    "quantitative_measurement_valid": false,
+    "seconds": 48.87160499999993,
+    "excluded_attachment_count": 1,
+    "gray_reference": {
+      "estimated_base_gray_0_255": 69.63560298085213,
+      "surface_std_original": 34.63527297973633,
+      "surface_std_textured": 1.8559632301330566,
+      "surface_std_template": 0.0,
+      "nozzle_core_radius_px": 22.2456,
+      "nozzle_pixels_preserved": true,
+      "ring_geometry_preserved_but_illumination_normalized": true,
+      "template_is_estimated_reference_not_measured_texture": true
+    },
+    "physical_pressure_velocity_formula_used": false,
+    "limits": "单段真实背景加合成监督；同亮度、过曝区域仍欠定；喷雾灰度及边界为估计，不宣称重建真实纹理"
+  },
+  "gui": {
+    "engine": "gray_scene",
+    "gray_entry_selected": true,
+    "output_argument_present": true,
+    "checkpoint_argument_present": true,
+    "execution_mocked": true
+  },
+  "tests": {
+    "v5": 4,
+    "restoration_regression": 10,
+    "deep_regression": 14,
+    "all_passed": true
+  },
+  "acceptance": "research_trial_not_accepted",
+  "known_visual_defects": [
+    "重合区灰色扇形与局部块状过渡",
+    "薄雾与喷束间隙恢复不可靠",
+    "部分边界外扩"
+  ],
+  "default_processing_size": 256
+}
