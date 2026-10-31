@@ -1,0 +1,189 @@
+{
+  "version": "6.0.0-alpha1",
+  "training": {
+    "version": "6.0.0-alpha1",
+    "steps": 1200,
+    "best_step": 1200,
+    "size": 256,
+    "seed": 20261032,
+    "seconds": 187.69538260000036,
+    "human_labels": 0,
+    "real_pristine_accuracy_available": false,
+    "test": {
+      "split": "test",
+      "samples": 64,
+      "scores": {
+        "real_texture_network": {
+          "fg_mae": 0.014333657574641735,
+          "bg_mae": 0.008958058233384962,
+          "glare_overlap_fg_mae": 0.03312945461386378
+        },
+        "covariance": {
+          "fg_mae": 0.023046514039977237,
+          "bg_mae": 0.008152631376728867,
+          "glare_overlap_fg_mae": 0.05070279882425337
+        },
+        "static_subtraction": {
+          "fg_mae": 0.026836177104362365,
+          "bg_mae": 0.003756139159718633,
+          "glare_overlap_fg_mae": 0.0648754950111556
+        },
+        "flat_field": {
+          "fg_mae": 0.048438616782771476,
+          "bg_mae": 0.005087691855120969,
+          "glare_overlap_fg_mae": 0.10780191090933006
+        },
+        "v5": {
+          "fg_mae": 0.029379100723552334,
+          "bg_mae": 0.02295580127022483,
+          "glare_overlap_fg_mae": 0.07068668016837577
+        }
+      },
+      "proxy_relighting_test_only": true,
+      "original_glare_region_ground_truth_available": false
+    }
+  },
+  "real_sequence": {
+    "version": "6.0.0-alpha1",
+    "model_kind": "counterfactual_real_texture",
+    "frames": 70,
+    "fit_background_frames": 3,
+    "heldout_empty_frames": [
+      4,
+      5
+    ],
+    "checkpoint_step": 1200,
+    "checkpoint_sha256": "80a88e0174ac820b030b705e86030ec404debe9153edf9759e09ec2d2f0dc18f",
+    "size": 256,
+    "model_input": "前帧、当前帧、后帧、原背景、灰底参考及差分通道",
+    "equation": "J=I-T*(B_lit-B_gray)，T由网络及成像范围约束共同估计",
+    "network_response_calibrated_on_empty_reference": true,
+    "nozzle_core_preserved": true,
+    "boundary": {
+      "frames": 70,
+      "raw_images_read_by_boundary_stage": false,
+      "input_contract": "saved_gray_scene_png_only",
+      "human_labels": 0,
+      "artificial_roi_edges_excluded_from_overlay": true,
+      "empty_frame_false_positive_pixels": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "quantitative_measurement_valid": false,
+      "reason": "恢复与边界均未通过真实标注精度验证；紫色不作为确定测量"
+    },
+    "human_labels": 0,
+    "real_accuracy_available": false,
+    "empty_surface_std_gray": [
+      2.5253891944885254,
+      2.5370099544525146,
+      2.542778253555298,
+      2.6810896396636963,
+      2.6837210655212402
+    ],
+    "quantitative_measurement_valid": false,
+    "seconds": 46.52309770000011,
+    "excluded_attachment_count": 1,
+    "gray_reference": {
+      "estimated_base_gray_0_255": 69.63560298085213,
+      "surface_std_original": 34.63527297973633,
+      "surface_std_textured": 1.8559632301330566,
+      "surface_std_template": 0.0,
+      "nozzle_core_radius_px": 22.2456,
+      "nozzle_pixels_preserved": true,
+      "ring_geometry_preserved_but_illumination_normalized": true,
+      "template_is_estimated_reference_not_measured_texture": true
+    },
+    "physical_pressure_velocity_formula_used": false,
+    "limits": "单段数据的反事实配对或程序合成监督；原始重合区无真值；喷雾灰度及边界为估计，不宣称重建真实纹理",
+    "boundary_regenerated_separately": true
+  },
+  "stress_test": {
+    "tests": {
+      "nominal": {
+        "fg_mae_gray": 3.656273444476576,
+        "overlap_mae_gray": 9.269808920664577,
+        "samples": 48
+      },
+      "extra_noise_2gray": {
+        "fg_mae_gray": 4.330425566164502,
+        "overlap_mae_gray": 9.459785661920886,
+        "samples": 48
+      },
+      "background_shift_2px": {
+        "fg_mae_gray": 3.9900146457636945,
+        "overlap_mae_gray": 10.1418010039295,
+        "samples": 48
+      },
+      "brightness_scale_1_05": {
+        "fg_mae_gray": 3.8886217683388296,
+        "overlap_mae_gray": 9.907045629957455,
+        "samples": 48
+      },
+      "neighbors_replaced_by_current": {
+        "fg_mae_gray": 3.656524028059116,
+        "overlap_mae_gray": 9.273650627731781,
+        "samples": 48
+      }
+    },
+    "counterfactual_only": true,
+    "model_frozen_during_tests": true
+  },
+  "gui": {
+    "loaded_v6_checkpoint": true,
+    "gray_scene_route": true,
+    "launch_mocked": true,
+    "full_70_frame_processing_was_cli": true
+  },
+  "tests": {
+    "new_real_texture_tests": 3,
+    "gray_scene_regression": 4,
+    "passed": true
+  },
+  "acceptance": "research_trial_not_accepted",
+  "additional_real_sequence_available": false,
+  "real_glare_ground_truth_available": false,
+  "threshold_diagnostic": {
+    "samples": 64,
+    "counterfactual_only": true,
+    "full_boundary_pipeline": false,
+    "threshold_gray": 10,
+    "meaning": "固定阈值的图像支持诊断；不是完整边界模块精度，更不是原始白斑区真实精度",
+    "results": {
+      "V6": {
+        "iou": 0.9882628566233421,
+        "recall": 0.9951626453970482,
+        "false_positive_rate": 0.23917973462002412,
+        "edge_f1_tolerance_2_processing_pixels": 0.8977187800661899
+      },
+      "V5": {
+        "iou": 0.9763243065003727,
+        "recall": 0.9925210793589537,
+        "false_positive_rate": 0.5683232810615199,
+        "edge_f1_tolerance_2_processing_pixels": 0.6754035648592955
+      },
+      "correlation": {
+        "iou": 0.9811134515991508,
+        "recall": 0.9869766780211987,
+        "false_positive_rate": 0.20472858866103738,
+        "edge_f1_tolerance_2_processing_pixels": 0.8299980702228662
+      },
+      "static": {
+        "iou": 0.950380498234657,
+        "recall": 0.9516046228462012,
+        "false_positive_rate": 0.04412545235223161,
+        "edge_f1_tolerance_2_processing_pixels": 0.7747272142378249
+      },
+      "flatfield": {
+        "iou": 0.879992794684391,
+        "recall": 0.8807253003716221,
+        "false_positive_rate": 0.028516284680337758,
+        "edge_f1_tolerance_2_processing_pixels": 0.5900330974449733
+      }
+    }
+  },
+  "known_defect": "弱灰度区域误报与重合区残差仍存在；高代理IoU不能作为真实验收"
+}

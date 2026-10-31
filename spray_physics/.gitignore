@@ -5,6 +5,7 @@ config.local.json
 config.deep.local.json
 config.restore.local.json
 config.gray.local.json
+config.gray*.local.json
 _test_tmp/
 results/
 .local_versions/

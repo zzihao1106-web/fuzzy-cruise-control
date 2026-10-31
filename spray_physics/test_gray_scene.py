@@ -60,10 +60,17 @@ class GraySceneTests(unittest.TestCase):
                    "source_xy": [64, 48], "chamber_xy": [64, 48], "chamber_axes_px": [43, 43]}
             summary = gray_boundary(frames, p/"boundary", cfg)
             self.assertFalse(summary["raw_images_read_by_boundary_stage"])
+            self.assertTrue(summary["artificial_roi_edges_excluded_from_overlay"])
             self.assertEqual(summary["empty_frame_false_positive_pixels"], [0]*5)
             record = json.loads((p/"boundary/boundary_inputs.json").read_text(encoding="utf-8"))[-1]
             self.assertGreater(record["mask_pixels"], 0)
             self.assertFalse(record["quantitative_measurement_valid"])
+            overlay = np.asarray(Image.open(p/"boundary/overlays/000006.png"))
+            yy, xx = np.indices(overlay.shape[:2])
+            core = np.hypot(xx-64, yy-48) < 5
+            colored = (overlay[:, :, 1] == 231) & (overlay[:, :, 0] == 48)
+            colored |= (overlay[:, :, 0] == 207) & (overlay[:, :, 2] == 255)
+            self.assertFalse(colored[core].any())
 
     def test_prepare_train_save_then_segment_pipeline(self):
         with tempfile.TemporaryDirectory(dir=ROOT) as folder:

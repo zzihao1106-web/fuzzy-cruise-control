@@ -160,9 +160,13 @@ def process_gray(args):
     noise = np.median(np.abs(reference_frames-reference), 0)*1.4826+2/255
     b, g = crop_resize(reference, bounds, args.size), crop_resize(gray, bounds, args.size)
     bundle = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
-    if bundle.get("kind") != "temporal_gray_scene":
-        raise ValueError("请选择V5灰底场景权重；旧黑底恢复模型不兼容。")
-    model = TemporalGrayRestorer(**bundle["spec"]).to(device).eval()
+    real_texture = bundle.get("kind") == "counterfactual_real_texture"
+    if bundle.get("kind") not in {"temporal_gray_scene", "counterfactual_real_texture"}:
+        raise ValueError("请选择V5/V6灰底场景权重；旧黑底恢复模型不兼容。")
+    if real_texture:
+        from real_texture_training import RealTextureRestorer
+    model_type = RealTextureRestorer if real_texture else TemporalGrayRestorer
+    model = model_type(**bundle["spec"]).to(device).eval()
     model.load_state_dict(bundle["model"])
     with torch.inference_mode():
         base_input = torch.from_numpy(temporal_channels(b, b, b, b, g)[None]).to(device)
@@ -204,8 +208,11 @@ def process_gray(args):
         off[y0:y1, x0:x1] = cv2.resize(offset, (x1-x0, y1-y0), interpolation=cv2.INTER_LINEAR)
         estimated_bg = np.clip(reference+off, 0, 1)
         eps = noise*1.5
-        physical_tmax = np.clip(np.minimum((image+eps)/(estimated_bg+eps),
-                                           (1-image+eps)/(1-estimated_bg+eps)), 0, 1)
+        physical_tmax = (image+eps)/(estimated_bg+eps)
+        if not real_texture:
+            physical_tmax = np.minimum(physical_tmax, (1-image+eps)/(1-estimated_bg+eps))
+        # V6覆盖近似加性反光，不再强加S<=1-T这一仅对特定混合模型成立的条件。
+        physical_tmax = np.clip(physical_tmax, 0, 1)
         transmission = np.minimum(1-a, physical_tmax)
         replaced = image-transmission*(estimated_bg-gray)
         original = read_gray(path)
@@ -257,7 +264,8 @@ def process_gray(args):
     write_json(out/"frame_mapping.json", records)
     cfg["engine"] = "gray_scene"; cfg["gray_processing_size"] = args.size
     write_json(out/"运行配置.json", cfg)
-    summary = {"version": VERSION, "frames": len(paths), "fit_background_frames": fit_count,
+    summary = {"version": bundle.get("version", VERSION), "model_kind": bundle["kind"],
+               "frames": len(paths), "fit_background_frames": fit_count,
                "heldout_empty_frames": [fit_count+1, count], "checkpoint_step": bundle["step"],
                "checkpoint_sha256": digest(args.checkpoint), "size": args.size,
                "model_input": "前帧、当前帧、后帧、原背景、灰底参考及差分通道",
@@ -268,7 +276,7 @@ def process_gray(args):
                "quantitative_measurement_valid": False, "seconds": time.perf_counter()-start,
                "excluded_attachment_count": len(excluded), "gray_reference": stats,
                "physical_pressure_velocity_formula_used": False,
-               "limits": "单段真实背景加合成监督；同亮度、过曝区域仍欠定；喷雾灰度及边界为估计，不宣称重建真实纹理"}
+               "limits": "单段数据的反事实配对或程序合成监督；原始重合区无真值；喷雾灰度及边界为估计，不宣称重建真实纹理"}
     write_json(out/"gray_scene_summary.json", summary)
     print(json.dumps(summary, ensure_ascii=False), flush=True)
     return summary

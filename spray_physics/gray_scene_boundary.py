@@ -26,6 +26,7 @@ def gray_boundary(folder, output, cfg, uncertainty_folder=None):
     sx, sy = cfg["source_xy"]; radius = min(ax, ay)
     rho = np.hypot((xx-cx)/ax, (yy-cy)/ay)
     roi = (rho < 0.97) & (np.hypot(xx-sx, yy-sy) > radius*0.065)
+    interior = cv2.erode(roi.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
     noise = np.median(np.abs(empty-base), 0)*1.4826+1/255
     high = np.maximum(float(cfg.get("threshold_gray", 10))/255, noise*4)
     low = np.maximum(high*0.5, noise*2.5)
@@ -51,7 +52,8 @@ def gray_boundary(folder, output, cfg, uncertainty_folder=None):
             state = "estimated_boundary" if mask.any() else "no_supported_boundary"
         canvas = Image.fromarray(np.uint8(np.rint(image*255))).convert("RGB")
         canvas_array = np.array(canvas)
-        edge = cv2.morphologyEx(mask.astype(np.uint8), cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8)) > 0
+        edge = (cv2.morphologyEx(mask.astype(np.uint8), cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8)) > 0) & interior
+        # 喷孔保护区和视窗裁切产生的人工截断，不画成已识别的喷雾物理边界。
         unknown_edge = edge & (cv2.dilate(uncertain.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0)
         canvas_array[edge] = [48, 231, 130]
         canvas_array[unknown_edge] = [207, 110, 255]
@@ -63,12 +65,14 @@ def gray_boundary(folder, output, cfg, uncertainty_folder=None):
             Image.fromarray(np.uint8(field*255)).save(out/name/path.name)
         records.append({"frame": index, "state": state, "input_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                         "mask_pixels": int(mask.sum()), "uncertain_pixels": int(uncertain.sum()),
+                        "censored_pixels_at_roi": int((mask & ~interior).sum()),
                         "quantitative_measurement_valid": False})
         previous_signal = signal
     frames[0].save(out/"灰底边界动画.gif", save_all=True, append_images=frames[1:], duration=100, loop=0, disposal=2)
     write_json(out/"boundary_inputs.json", records)
     summary = {"frames": len(paths), "raw_images_read_by_boundary_stage": False,
                "input_contract": "saved_gray_scene_png_only", "human_labels": 0,
+               "artificial_roi_edges_excluded_from_overlay": True,
                "empty_frame_false_positive_pixels": [r["mask_pixels"] for r in records[:count]],
                "quantitative_measurement_valid": False,
                "reason": "恢复与边界均未通过真实标注精度验证；紫色不作为确定测量"}
