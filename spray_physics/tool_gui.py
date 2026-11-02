@@ -22,7 +22,7 @@ HERE = Path(__file__).resolve().parent
 class SprayTool(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("喷雾识别工具：先去白斑，再捕捉边界")
+        self.title("喷雾识别研究工具：历史模式尚未验收")
         self.geometry(f"{min(1220, self.winfo_screenwidth()-80)}x{min(880, self.winfo_screenheight()-100)}")
         self.minsize(960, 680)
         self.config_data = json.loads((HERE / ("config.json" if (HERE / "config.json").exists() else "config.example.json")).read_text(encoding="utf-8"))
@@ -40,8 +40,8 @@ class SprayTool(tk.Tk):
         self.pressure_confirmed = tk.BooleanVar(value=False)
         self.consecutive = tk.BooleanVar(value=True)
         self.polarity = tk.StringVar(value="自动")
-        default_engine = "V5/V6灰底场景试验" if Path(default_checkpoint).name.startswith("gray_") else (
-            "V4先去白再识别" if default_checkpoint and Path(default_checkpoint).name.startswith("restore_") else "V2图像证据")
+        # 目录中的历史权重不代表已通过真实验收，不自动启用先去白路线。
+        default_engine = "V2图像证据"
         self.engine = tk.StringVar(value=default_engine)
         self.loaded_source = None
         self.status = tk.StringVar(value="选择一个图像序列文件夹，加载预览并检查一次标定。")
@@ -61,7 +61,7 @@ class SprayTool(tk.Tk):
         ttk.Style().configure("TButton", font=("Microsoft YaHei UI", 10))
         outer = ttk.Frame(self, padding=15); outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="喷雾物理约束识别", font=("Microsoft YaHei UI", 18, "bold")).pack(anchor="w")
-        ttk.Label(outer, text="选择序列 → 一次标定 → 整段处理；V6.1增加有证据支持的内圈喷雾保留").pack(anchor="w", pady=(4, 12))
+        ttk.Label(outer, text="历史试验模式均未通过真实边界验收；V5/V6先去白路线暂停推荐，新路线见复审报告").pack(anchor="w", pady=(4, 12))
         paths = ttk.Frame(outer); paths.pack(fill="x")
         for row, (key, label) in enumerate([("source_dir", "输入图像文件夹"), ("output_dir", "结果保存位置")]):
             ttk.Label(paths, text=label).grid(row=row, column=0, sticky="w", pady=4)

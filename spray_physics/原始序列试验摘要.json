@@ -1,0 +1,333 @@
+{
+  "experiment": "fixed_camera_diesel_70_frames",
+  "review_date": "2026-11-02",
+  "previous_git_commit": "4935267006241d56412fe83e830652849b6f978e",
+  "human_ground_truth_count": 0,
+  "exploratory_not_blind_evaluation": true,
+  "summary": {
+    "status": "research_candidates_not_accepted",
+    "frames": 70,
+    "human_labels": 0,
+    "illumination": "camera_same_side_or_side",
+    "illumination_confirmed": true,
+    "implementation_sha256": "af8ec6506d8bfd771cd9ed26ea9ff623a1d06a76fa14ae9d5aecfa75c30c603b",
+    "reference_frames": [
+      1,
+      2,
+      3
+    ],
+    "heldout_empty_frames": [
+      4,
+      5
+    ],
+    "intensity_high_gray": 6.0,
+    "texture_high_gray": 1.878897100687027,
+    "directional_high_gray": 8.0,
+    "directional_smooth_degrees": 20,
+    "directional_polarity": "positive_bright_jet_candidate_only",
+    "directional_note": "角向对比会移除轴对称或宽角度喷雾，不能拿此候选掩膜删除原图像素",
+    "uses_future_frames": false,
+    "fills_holes": false,
+    "monotone_growth": false,
+    "optical_layer_reconstruction": false,
+    "physics_completion": false,
+    "quantitative_measurement_valid": false,
+    "threshold_iou_note": "只表示阈值扰动稳定性，不是相对真值的准确率",
+    "empty_false_positive_pixels": {
+      "intensity": [
+        0,
+        0
+      ],
+      "texture": [
+        0,
+        0
+      ],
+      "fusion": [
+        0,
+        0
+      ],
+      "directional": [
+        0,
+        0
+      ]
+    },
+    "crop_bounds_xyxy": [
+      305,
+      20,
+      1031,
+      738
+    ],
+    "roi_pixels": 367478,
+    "inner_pixels": 67520,
+    "excluded_attachment_count": 1
+  },
+  "selected_frame_metrics": [
+    {
+      "frame": 5,
+      "heldout_empty": true,
+      "methods": {
+        "intensity": {
+          "candidate_pixels": 0,
+          "inner_candidate_fraction": 0.0,
+          "white_candidate_fraction": 0.0,
+          "threshold_80_120_iou": 0.0
+        },
+        "texture": {
+          "candidate_pixels": 0,
+          "inner_candidate_fraction": 0.0,
+          "white_candidate_fraction": 0.0,
+          "threshold_80_120_iou": 0.0
+        },
+        "fusion": {
+          "candidate_pixels": 0,
+          "inner_candidate_fraction": 0.0,
+          "white_candidate_fraction": 0.0,
+          "threshold_80_120_iou": 0.0
+        },
+        "directional": {
+          "candidate_pixels": 0,
+          "inner_candidate_fraction": 0.0,
+          "white_candidate_fraction": 0.0,
+          "threshold_80_120_iou": 1.0
+        }
+      },
+      "quantitative_measurement_valid": false
+    },
+    {
+      "frame": 6,
+      "heldout_empty": false,
+      "methods": {
+        "intensity": {
+          "candidate_pixels": 2701,
+          "inner_candidate_fraction": 0.01270734597156398,
+          "white_candidate_fraction": 0.00015109163707788774,
+          "threshold_80_120_iou": 0.030099027102154275
+        },
+        "texture": {
+          "candidate_pixels": 4616,
+          "inner_candidate_fraction": 0.03739632701421801,
+          "white_candidate_fraction": 0.00015109163707788774,
+          "threshold_80_120_iou": 0.007935013771223373
+        },
+        "fusion": {
+          "candidate_pixels": 6881,
+          "inner_candidate_fraction": 0.06996445497630331,
+          "white_candidate_fraction": 0.00015109163707788774,
+          "threshold_80_120_iou": 0.008343572306197674
+        },
+        "directional": {
+          "candidate_pixels": 687,
+          "inner_candidate_fraction": 0.002384478672985782,
+          "white_candidate_fraction": 0.0,
+          "threshold_80_120_iou": 0.854381443298969
+        }
+      },
+      "quantitative_measurement_valid": false
+    },
+    {
+      "frame": 13,
+      "heldout_empty": false,
+      "methods": {
+        "intensity": {
+          "candidate_pixels": 277939,
+          "inner_candidate_fraction": 0.9977488151658768,
+          "white_candidate_fraction": 0.6292211226108635,
+          "threshold_80_120_iou": 0.699163757604259
+        },
+        "texture": {
+          "candidate_pixels": 148021,
+          "inner_candidate_fraction": 0.9107671800947867,
+          "white_candidate_fraction": 0.05507290171489008,
+          "threshold_80_120_iou": 0.29005360147599174
+        },
+        "fusion": {
+          "candidate_pixels": 304981,
+          "inner_candidate_fraction": 0.9985485781990522,
+          "white_candidate_fraction": 0.684256251416484,
+          "threshold_80_120_iou": 0.6552697616060226
+        },
+        "directional": {
+          "candidate_pixels": 65096,
+          "inner_candidate_fraction": 0.5240965639810427,
+          "white_candidate_fraction": 0.003399561834252474,
+          "threshold_80_120_iou": 0.8126824127121393
+        }
+      },
+      "quantitative_measurement_valid": false
+    },
+    {
+      "frame": 24,
+      "heldout_empty": false,
+      "methods": {
+        "intensity": {
+          "candidate_pixels": 342328,
+          "inner_candidate_fraction": 0.9986522511848341,
+          "white_candidate_fraction": 0.446135831381733,
+          "threshold_80_120_iou": 0.9490340967268508
+        },
+        "texture": {
+          "candidate_pixels": 216547,
+          "inner_candidate_fraction": 0.7695645734597156,
+          "white_candidate_fraction": 0.17809926720556019,
+          "threshold_80_120_iou": 0.19087745337135642
+        },
+        "fusion": {
+          "candidate_pixels": 345022,
+          "inner_candidate_fraction": 0.9989780805687204,
+          "white_candidate_fraction": 0.46615547329455315,
+          "threshold_80_120_iou": 0.9352213359585632
+        },
+        "directional": {
+          "candidate_pixels": 144647,
+          "inner_candidate_fraction": 0.45715343601895736,
+          "white_candidate_fraction": 0.005099342751378712,
+          "threshold_80_120_iou": 0.9134932791084586
+        }
+      },
+      "quantitative_measurement_valid": false
+    },
+    {
+      "frame": 50,
+      "heldout_empty": false,
+      "methods": {
+        "intensity": {
+          "candidate_pixels": 351602,
+          "inner_candidate_fraction": 0.9948904028436019,
+          "white_candidate_fraction": 0.6881090881619703,
+          "threshold_80_120_iou": 0.9694024337001421
+        },
+        "texture": {
+          "candidate_pixels": 1870,
+          "inner_candidate_fraction": 0.022467417061611376,
+          "white_candidate_fraction": 0.0,
+          "threshold_80_120_iou": 0.000432274315430243
+        },
+        "fusion": {
+          "candidate_pixels": 353913,
+          "inner_candidate_fraction": 0.9960308056872038,
+          "white_candidate_fraction": 0.6913575583591448,
+          "threshold_80_120_iou": 0.9587054250277859
+        },
+        "directional": {
+          "candidate_pixels": 156032,
+          "inner_candidate_fraction": 0.35328791469194315,
+          "white_candidate_fraction": 0.0001133187278084158,
+          "threshold_80_120_iou": 0.9050077912554615
+        }
+      },
+      "quantitative_measurement_valid": false
+    },
+    {
+      "frame": 70,
+      "heldout_empty": false,
+      "methods": {
+        "intensity": {
+          "candidate_pixels": 352439,
+          "inner_candidate_fraction": 0.9891439573459716,
+          "white_candidate_fraction": 0.728752738535922,
+          "threshold_80_120_iou": 0.96640492909688
+        },
+        "texture": {
+          "candidate_pixels": 182,
+          "inner_candidate_fraction": 0.0019105450236966825,
+          "white_candidate_fraction": 0.0,
+          "threshold_80_120_iou": 0.0
+        },
+        "fusion": {
+          "candidate_pixels": 354773,
+          "inner_candidate_fraction": 0.9909063981042654,
+          "white_candidate_fraction": 0.7323033920072524,
+          "threshold_80_120_iou": 0.9567698983468981
+        },
+        "directional": {
+          "candidate_pixels": 150577,
+          "inner_candidate_fraction": 0.30194016587677724,
+          "white_candidate_fraction": 0.0,
+          "threshold_80_120_iou": 0.8889312643017018
+        }
+      },
+      "quantitative_measurement_valid": false
+    }
+  ],
+  "raw_signal_audit": {
+    "illumination_user_confirmed": "camera_same_side_or_side",
+    "white_area_pixels": 26651,
+    "frames": [
+      {
+        "frame": 1,
+        "saturated_fraction_roi": 8.134512295315334e-06,
+        "saturated_fraction_original_white": 0.00011256613260290421,
+        "white_changed_fraction_above_6gray": 0.0013507935912348504,
+        "white_median_abs_change_gray": 0.9999999403953552,
+        "white_mean_original_gray": 189.9627685546875
+      },
+      {
+        "frame": 3,
+        "saturated_fraction_roi": 8.134512295315334e-06,
+        "saturated_fraction_original_white": 0.00011256613260290421,
+        "white_changed_fraction_above_6gray": 0.0011631833702300102,
+        "white_median_abs_change_gray": 0.9999999403953552,
+        "white_mean_original_gray": 189.97494506835938
+      },
+      {
+        "frame": 4,
+        "saturated_fraction_roi": 8.134512295315334e-06,
+        "saturated_fraction_original_white": 0.00011256613260290421,
+        "white_changed_fraction_above_6gray": 0.0031518517128813176,
+        "white_median_abs_change_gray": 0.9999999403953552,
+        "white_mean_original_gray": 189.96739196777344
+      },
+      {
+        "frame": 5,
+        "saturated_fraction_roi": 8.134512295315334e-06,
+        "saturated_fraction_original_white": 0.00011256613260290421,
+        "white_changed_fraction_above_6gray": 0.0030392855802784135,
+        "white_median_abs_change_gray": 0.9999999403953552,
+        "white_mean_original_gray": 189.9949951171875
+      },
+      {
+        "frame": 6,
+        "saturated_fraction_roi": 0.0,
+        "saturated_fraction_original_white": 0.0,
+        "white_changed_fraction_above_6gray": 0.0075419308843945815,
+        "white_median_abs_change_gray": 0.9999999403953552,
+        "white_mean_original_gray": 189.54823303222656
+      },
+      {
+        "frame": 13,
+        "saturated_fraction_roi": 0.0,
+        "saturated_fraction_original_white": 0.0,
+        "white_changed_fraction_above_6gray": 0.25552512100859254,
+        "white_median_abs_change_gray": 3.999999761581421,
+        "white_mean_original_gray": 185.81007385253906
+      },
+      {
+        "frame": 24,
+        "saturated_fraction_roi": 0.0,
+        "saturated_fraction_original_white": 0.0,
+        "white_changed_fraction_above_6gray": 0.2518479606768977,
+        "white_median_abs_change_gray": 2.999999761581421,
+        "white_mean_original_gray": 189.33375549316406
+      },
+      {
+        "frame": 50,
+        "saturated_fraction_roi": 0.0,
+        "saturated_fraction_original_white": 0.0,
+        "white_changed_fraction_above_6gray": 0.4489887809087839,
+        "white_median_abs_change_gray": 5.999999523162842,
+        "white_mean_original_gray": 184.45018005371094
+      },
+      {
+        "frame": 70,
+        "saturated_fraction_roi": 0.0,
+        "saturated_fraction_original_white": 0.0,
+        "white_changed_fraction_above_6gray": 0.5041837079284079,
+        "white_median_abs_change_gray": 6.999999523162842,
+        "white_mean_original_gray": 183.30581665039062
+      }
+    ]
+  },
+  "ordered_input_sha256_digest": "2515cdc75ae3250a7f3c8d7dd3ba58807b82e8625c08508a48d037799d9691ee",
+  "engineering_tests_passed": 8,
+  "engineering_tests_are_accuracy_evaluation": false
+}
