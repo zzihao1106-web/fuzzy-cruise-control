@@ -1,0 +1,425 @@
+{
+  "version": "physics-prior-0.1",
+  "ambient_gas": "air",
+  "air_temperature_K": 298.15,
+  "air_temperature_measured": false,
+  "temperature_assumption_source": "model_assumption_user_authorized",
+  "pressure_scenarios": [
+    {
+      "ambient_basis_scenario": "absolute",
+      "injection_basis_scenario": "absolute",
+      "ambient_absolute_pa": 4000000.0,
+      "delta_pa": 136000000.0,
+      "temperature_K": 298.15,
+      "air_density_kg_m3": 46.73773119220387,
+      "density_model": "ideal_dry_air_Z_1_assumed",
+      "penetration_scale_m_sqrt_s": 0.5896634496616892
+    },
+    {
+      "ambient_basis_scenario": "absolute",
+      "injection_basis_scenario": "gauge",
+      "ambient_absolute_pa": 4000000.0,
+      "delta_pa": 136101325.0,
+      "temperature_K": 298.15,
+      "air_density_kg_m3": 46.73773119220387,
+      "density_model": "ideal_dry_air_Z_1_assumed",
+      "penetration_scale_m_sqrt_s": 0.5897732492268819
+    },
+    {
+      "ambient_basis_scenario": "gauge",
+      "injection_basis_scenario": "absolute",
+      "ambient_absolute_pa": 4101325.0,
+      "delta_pa": 135898675.0,
+      "temperature_K": 298.15,
+      "air_density_kg_m3": 47.92165634546638,
+      "density_model": "ideal_dry_air_Z_1_assumed",
+      "penetration_scale_m_sqrt_s": 0.5858780654301006
+    },
+    {
+      "ambient_basis_scenario": "gauge",
+      "injection_basis_scenario": "gauge",
+      "ambient_absolute_pa": 4101325.0,
+      "delta_pa": 136000000.0,
+      "temperature_K": 298.15,
+      "air_density_kg_m3": 47.92165634546638,
+      "density_model": "ideal_dry_air_Z_1_assumed",
+      "penetration_scale_m_sqrt_s": 0.5859872414470234
+    }
+  ],
+  "nominal_scenario_is_assumption": true,
+  "mm_per_pixel": 0.08712,
+  "fps": 10000.0,
+  "consecutive_frames_assumed": true,
+  "fit_frames_1based": [
+    6,
+    12
+  ],
+  "test_frames_1based": [
+    13,
+    18
+  ],
+  "directions_estimated_from_training_frames_only": true,
+  "angles_deg": [
+    8.5,
+    38.0,
+    72.0,
+    104.00000000000001,
+    136.5,
+    166.00000000000003,
+    192.50000000000003,
+    220.0,
+    249.99999999999997,
+    280.0,
+    310.5,
+    340.0
+  ],
+  "clear_jet_indices_1based": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "fitted_onset_ms_relative_first_frame": 0.38000000000000006,
+  "transition_ms": 1.6169781998716855,
+  "transition_is_effective_interpolation_parameter_not_measured_breakup": true,
+  "coefficients": [
+    1.7453447867608454,
+    1.7430784665288568,
+    1.7929337941313634,
+    1.991434158645505,
+    2.0118413836714772,
+    1.8944724125064674,
+    1.9537598670552985,
+    1.736554015217093,
+    1.771728590327939,
+    1.8123398275588536,
+    1.9955951414234345,
+    1.748767607737594
+  ],
+  "training_error": {
+    "samples": 73,
+    "mae_mm": 0.3514566392156847,
+    "rmse_mm": 0.4946481221213985
+  },
+  "blind_test_physics": {
+    "samples": 55,
+    "mae_mm": 1.5762829528241549,
+    "rmse_mm": 2.013057032756889
+  },
+  "blind_test_persistence": {
+    "samples": 55,
+    "mae_mm": 4.734576,
+    "rmse_mm": 5.25042002653502
+  },
+  "blind_test_free_power": {
+    "samples": 55,
+    "mae_mm": 2.1399623756131536,
+    "rmse_mm": 2.744031517732147
+  },
+  "blind_test_interval_coverage": 0.4909090909090909,
+  "interval_coverage_is_not_calibrated": true,
+  "hard_boundary_constraints_enabled": false,
+  "restored_appearance_modified": false,
+  "viewport_is_not_wall": true,
+  "predictions_are_not_clamped_to_viewport": true,
+  "raw_images_read": false,
+  "reference": "清晰去白图阈值前沿，非人工真值",
+  "human_labels": 0,
+  "input_hashes": [
+    {
+      "file": "000001.png",
+      "sha256": "505dddccbe9fc688e9610dbaaa04cd410a1e663232f96a6c8c4d67e012fb93e3"
+    },
+    {
+      "file": "000002.png",
+      "sha256": "707f319e93db627356ecc0899c03cecf93f00e99a93211907f321909c9554496"
+    },
+    {
+      "file": "000003.png",
+      "sha256": "7c94d50777bda64de32397fce5b5cc4dbe52544e62882a14901e86b887222c37"
+    },
+    {
+      "file": "000004.png",
+      "sha256": "06248de3d0f36e3aedd8a433d73d7ec8112b197113a4a7f8c10f741c31de6e0d"
+    },
+    {
+      "file": "000005.png",
+      "sha256": "fd966000a6829a58b32b68727f2b9d982d4fce6fcc2afce2ccdfc621f76ded28"
+    },
+    {
+      "file": "000006.png",
+      "sha256": "e086c79c568bd035906c078f6985faa89794a7d232de4302b297b4d48bee81d3"
+    },
+    {
+      "file": "000007.png",
+      "sha256": "d6efc30671fa38379f8f52ddb6ff9891449e3089a35b550ee164c1f0595986dc"
+    },
+    {
+      "file": "000008.png",
+      "sha256": "12281b3024cff99b3f43f959cc79febf09d53ff57a4d47dba563d538a5d7e435"
+    },
+    {
+      "file": "000009.png",
+      "sha256": "0acc03cc03816396be8cf8fe6422c675239714727be098e439d00a99d1b0bfa9"
+    },
+    {
+      "file": "000010.png",
+      "sha256": "1f74c845df98114ff25e8e8acba226866a5dc650a454b7e9a642ac7e53153375"
+    },
+    {
+      "file": "000011.png",
+      "sha256": "c363ea730173d2c6d51a2f835fb7a30d28abd351fba0b069e7cb66f9d75ef3fa"
+    },
+    {
+      "file": "000012.png",
+      "sha256": "5a909a49715dec937980dc5b2960fa263212f38c72971c8d7028596dcc426c0f"
+    },
+    {
+      "file": "000013.png",
+      "sha256": "c5885fff580cfde0bd445e62dc3596eb2c0cfda3ee8df4d1e70f3d050be3ad64"
+    },
+    {
+      "file": "000014.png",
+      "sha256": "64978e09d1e2a31e94312b15483476692d4cfa4726803bb057da81832324f210"
+    },
+    {
+      "file": "000015.png",
+      "sha256": "baaf303d26e5821b7f95fa5c1bbe1e826ffa574f8d8215710ba78b0650a2dd98"
+    },
+    {
+      "file": "000016.png",
+      "sha256": "b4501c9380abc621ced27fd8e84e7974da83cf866087b78c3334137668bb4de1"
+    },
+    {
+      "file": "000017.png",
+      "sha256": "746c7ea84a18a572b7f9a6a6b86a141d8e1496a8cb45de3180e0137e346b8b62"
+    },
+    {
+      "file": "000018.png",
+      "sha256": "3db0ed2bcc273a4267a6de22d836716c60804c59ea9243d7185406fc6366df8a"
+    },
+    {
+      "file": "000019.png",
+      "sha256": "e720e21d7979437cc8f79ef4c192833581fc8877f1519aff4f92d58821c93f72"
+    },
+    {
+      "file": "000020.png",
+      "sha256": "4720487a41d8d277ebbd1174b279f39cbf73ab49de6ee03803908987047496f2"
+    },
+    {
+      "file": "000021.png",
+      "sha256": "00008e7bfd5da16895973b1f0ffed43cbdabd35f2213fe949e49c88aed3952d1"
+    },
+    {
+      "file": "000022.png",
+      "sha256": "aca984a8a2b20216dba34841e85ffe2291a95a32c2c0714e485caffec5896e66"
+    },
+    {
+      "file": "000023.png",
+      "sha256": "679f6dcf4400b09488d7977c165c8b1510171cbc0f9ee23c82d89af1c745c6ce"
+    },
+    {
+      "file": "000024.png",
+      "sha256": "8de85f57db85d2d1aee7ac43213259bf3b60471c7ad13da8189cf7f6723eee3e"
+    },
+    {
+      "file": "000025.png",
+      "sha256": "9a454632267f6bfc5e5fa7606cad9c477cc117b1455f976eaa871121fb85a1d8"
+    },
+    {
+      "file": "000026.png",
+      "sha256": "bbbca5fbe7923d967834cdd113b47334952f2e76b8926bd7fa8db64822e3c9ce"
+    },
+    {
+      "file": "000027.png",
+      "sha256": "29c5f44c342cb95308ac410169efe87ead3dd7d8ccfc7089a8cbf48c89ed2414"
+    },
+    {
+      "file": "000028.png",
+      "sha256": "77f59b5812aa3a65886928f523c8c5249b15da9b2b7a0b13036c5a18d00ad107"
+    },
+    {
+      "file": "000029.png",
+      "sha256": "cf6e90c06199135df37c642776ecbd65bdf02e4855c7264a20dd0298e3e817c4"
+    },
+    {
+      "file": "000030.png",
+      "sha256": "7416697a524c93c750eaa6a3ef4a101b53c58fc4bd8a103a109e3fb6497dcc2c"
+    },
+    {
+      "file": "000031.png",
+      "sha256": "0649517af4a2293ccbc1db8edd394a101aecc229d572941976e9b19eee480514"
+    },
+    {
+      "file": "000032.png",
+      "sha256": "551bc52b847831148022da04bdefa7624e0a3670761c7b1a45ce9bfb42bff87f"
+    },
+    {
+      "file": "000033.png",
+      "sha256": "0eb2089d9db874ccf6dda282a0c61334b881cbc47f31b419de7430d7edee0b8b"
+    },
+    {
+      "file": "000034.png",
+      "sha256": "072153208cd296409eb1f340dc9bfd003b0ac101c8672fed8df38087160ef0a2"
+    },
+    {
+      "file": "000035.png",
+      "sha256": "8fd83b2b64f719b2d14eda6489d6a19af5baa4bbcac851521e688b0031ffb063"
+    },
+    {
+      "file": "000036.png",
+      "sha256": "0b038dfabd5eb2965491d4c4b3c5711876f8d8afac8b13e864cf7fe1c1c6aa0d"
+    },
+    {
+      "file": "000037.png",
+      "sha256": "e3ffe088be2c29ba244fdb7e5c0797052bdb236a90240e697e8852ddc2835230"
+    },
+    {
+      "file": "000038.png",
+      "sha256": "3e360f3028468a1406c00e59e9e90aa27f07e228ce896fc52570e8c9a07af3c5"
+    },
+    {
+      "file": "000039.png",
+      "sha256": "1aaf7ed92e6ace501f92b5c9ba12ec5fef3d98a4b14bfc32fc7fe39494b7a0d1"
+    },
+    {
+      "file": "000040.png",
+      "sha256": "a533a7003f0459338d9ff8f40a23f9d2f724b8a51a3dd70931ecf0082638facd"
+    },
+    {
+      "file": "000041.png",
+      "sha256": "4733dec0c70b4eafdcc83742d0e05bee505d1f3a5077e83c0ddde16c4db0bd7f"
+    },
+    {
+      "file": "000042.png",
+      "sha256": "7814611fe283d8ba0eeeab63404dfd28c018bcfbd90c6b7f51637bc23d0fb046"
+    },
+    {
+      "file": "000043.png",
+      "sha256": "cb057913b1d3d2086a26e59117114e921cf80ea9b481933d07feb1c237a699e6"
+    },
+    {
+      "file": "000044.png",
+      "sha256": "0281ce909f2a058dcbb67fdf69ba037c780d035bdcabe8e44815b5e4b5ee50ed"
+    },
+    {
+      "file": "000045.png",
+      "sha256": "3c2e1588b6550202e821a958cc96c0258bba77bd6c1884351d31648f01d196b1"
+    },
+    {
+      "file": "000046.png",
+      "sha256": "936106a328d9f79c9dca57da7a95dfd29f91e199050704126388c529479ad3ec"
+    },
+    {
+      "file": "000047.png",
+      "sha256": "79c1fcc54d4c47aa3edbb9c5a85b29284c8dffb6fa082894a8347ec0f5d66299"
+    },
+    {
+      "file": "000048.png",
+      "sha256": "069bf2dba8fea3af6207d2d227644e84fa9dbff44e5b12b3ca1cf8b9dc4ee553"
+    },
+    {
+      "file": "000049.png",
+      "sha256": "a645d7f30e42fafd7f641f2ef64246c9b9b14f724cb3e954f82d68ccbca2f863"
+    },
+    {
+      "file": "000050.png",
+      "sha256": "3bcf3ff478d09701842d9543ad1d19ccf55626f15ec21eae69ec091b5b918c3a"
+    },
+    {
+      "file": "000051.png",
+      "sha256": "e5231c4b463fc6dcc9593d58b0f20991992c6f170a12791ac3505ab3fa413ed1"
+    },
+    {
+      "file": "000052.png",
+      "sha256": "2d98a2388d2652c1311c797cfc15cdb32508c803540c1e1327c842fa4b29a10b"
+    },
+    {
+      "file": "000053.png",
+      "sha256": "671de2b2fc03c7862f1ff346eb215f56068abecaef4f4c6cfaedd4f095617186"
+    },
+    {
+      "file": "000054.png",
+      "sha256": "5537df815d9846c0f1369dbbfca417d7da3d8e31e7fad196841ebc16156b92bc"
+    },
+    {
+      "file": "000055.png",
+      "sha256": "42ad391caa5193faccc102204369b736ef9cfd9d6bf2b29d3455a5cb259887ab"
+    },
+    {
+      "file": "000056.png",
+      "sha256": "f65a2b4b82d982a2acbc0dc605d52c3bccd1e4629834192877f4ebca49ec9788"
+    },
+    {
+      "file": "000057.png",
+      "sha256": "501b3bf259fee32575594b4fecbcb67463e74b3ce6989314aa994b8bbda6ebb7"
+    },
+    {
+      "file": "000058.png",
+      "sha256": "0021803b772b9f27aab3b6c69c02aaba36917bc0c43bbc8477c9c96571f4f14a"
+    },
+    {
+      "file": "000059.png",
+      "sha256": "83e281121c222eda15ec4d530b90e5302ff5eee78ec392fbe97297538b011c8c"
+    },
+    {
+      "file": "000060.png",
+      "sha256": "0e5def8e8bc6cc48df298602eea4a3bcd5e8fe2cbd0d33b045516a79ddd5dde9"
+    },
+    {
+      "file": "000061.png",
+      "sha256": "71c4f47a13c9b23a2f7bcb278074a63bd2b9196acab4f02bc54c316abbd1fede"
+    },
+    {
+      "file": "000062.png",
+      "sha256": "932eb73550e49f0dab42a25b776347ba0619180f43350b11b2f11fecdcf041d7"
+    },
+    {
+      "file": "000063.png",
+      "sha256": "d068699a718b661f77b23dadb6d8bd691a7c06072abf68bc7868494763717f2a"
+    },
+    {
+      "file": "000064.png",
+      "sha256": "01af29294db7a1289529892b6948aead65ae8cfd7cb4a50e3329570ba0f262c9"
+    },
+    {
+      "file": "000065.png",
+      "sha256": "78b22db16598b098872651e4763e9e3f8f3e439bb97b349e6c4f9f2c8cd8ee8e"
+    },
+    {
+      "file": "000066.png",
+      "sha256": "84ddc940542403254306f95b977da6875bfd86cbaafb370cdbb85539c8e044f0"
+    },
+    {
+      "file": "000067.png",
+      "sha256": "8167b380e3a58203aa19469c8f93c550ac6175d1927c3288e6069fc472946638"
+    },
+    {
+      "file": "000068.png",
+      "sha256": "5eff524210ce7b690e309aae30e380273e804446887253d3d4669ec88836d58f"
+    },
+    {
+      "file": "000069.png",
+      "sha256": "a7eb2a7329b49a190ce9a2a6187947c1f83952ee2c2476a98d65dbe19a459de6"
+    },
+    {
+      "file": "000070.png",
+      "sha256": "ca50251e4c736a37fe8a612202f93bf2b298b38d14c389d6bd72f7eacf494cbd"
+    }
+  ],
+  "extrapolation_after_test_is_unvalidated": true,
+  "physical_model": "S=C*(A*deltaP/rho_air)^0.25*tau/sqrt(tau+tau_b)",
+  "limits": "二维投影自由射流低阶插值；未验证喷射结束、碰壁、强蒸发阶段；不预测液滴纹理",
+  "tests": {
+    "count": 5,
+    "passed": true
+  }
+}

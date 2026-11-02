@@ -42,5 +42,13 @@
   "injection_pressure_value_confirmed": true,
   "injection_pressure_basis": null,
   "nozzle_diameter_mm": 0.23,
-  "nozzle_diameter_confirmed": true
+  "nozzle_diameter_confirmed": true,
+  "ambient_gas": "air",
+  "ambient_gas_confirmed": true,
+  "ambient_temperature_K": 298.15,
+  "ambient_temperature_source": "model_assumption_user_authorized",
+  "ambient_temperature_measured": false,
+  "ambient_pressure_basis": null,
+  "fuel_temperature_condition": "room_temperature",
+  "fuel_temperature_K": null
 }
