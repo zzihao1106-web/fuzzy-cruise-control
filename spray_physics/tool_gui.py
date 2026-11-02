@@ -28,13 +28,14 @@ class SprayTool(tk.Tk):
         self.config_data = json.loads((HERE / ("config.json" if (HERE / "config.json").exists() else "config.example.json")).read_text(encoding="utf-8"))
         self.config_data.update(source_xy=None, chamber_xy=None, chamber_axes_px=None, radial_bins=None, mm_per_pixel=None)
         candidates = [HERE / "models" / name for name in (
-            "gray_spray_v6_alpha1.pt", "gray_spray_v5_alpha1.pt", "restore_spray_v4_1_alpha1.pt", "restore_spray_v4_alpha1.pt", "deep_spray_v3_alpha2.pt")]
+            "gray_spray_v6_1_alpha1.pt", "gray_spray_v6_alpha1.pt", "gray_spray_v5_alpha1.pt", "restore_spray_v4_1_alpha1.pt", "restore_spray_v4_alpha1.pt", "deep_spray_v3_alpha2.pt")]
         default_checkpoint = next((str(path) for path in candidates if path.is_file()), "")
         self.variables = {key: tk.StringVar(value=value) for key, value in {
             "source_dir": "", "output_dir": "", "liquid_name": "柴油", "background_frames": "5", "fps": "10000",
             "known_diameter_mm": "60", "ambient_pressure_bar": "40", "threshold_gray": "10",
             "physics_weight": "0.14", "liquid_density_kg_m3": "", "injection_pressure_MPa_label": "140", "velocity_coefficient": "",
             "deep_checkpoint": default_checkpoint,
+            "source_preservation_strength": "0.95",
         }.items()}
         self.pressure_confirmed = tk.BooleanVar(value=False)
         self.consecutive = tk.BooleanVar(value=True)
@@ -60,7 +61,7 @@ class SprayTool(tk.Tk):
         ttk.Style().configure("TButton", font=("Microsoft YaHei UI", 10))
         outer = ttk.Frame(self, padding=15); outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="喷雾物理约束识别", font=("Microsoft YaHei UI", 18, "bold")).pack(anchor="w")
-        ttk.Label(outer, text="选择序列 → 一次标定 → 整段处理；V6真实纹理配对去白，再从灰底处理图捕捉边界").pack(anchor="w", pady=(4, 12))
+        ttk.Label(outer, text="选择序列 → 一次标定 → 整段处理；V6.1增加有证据支持的内圈喷雾保留").pack(anchor="w", pady=(4, 12))
         paths = ttk.Frame(outer); paths.pack(fill="x")
         for row, (key, label) in enumerate([("source_dir", "输入图像文件夹"), ("output_dir", "结果保存位置")]):
             ttk.Label(paths, text=label).grid(row=row, column=0, sticky="w", pady=4)
@@ -99,12 +100,13 @@ class SprayTool(tk.Tk):
                   ("known_diameter_mm", "标定圆直径（mm，可留空）"), ("ambient_pressure_bar", "环境背压（bar）"),
                   ("threshold_gray", "图像变化阈值（灰度）"), ("physics_weight", "增长模型权重"),
                   ("liquid_density_kg_m3", "液体密度（kg/m³，可留空）"),
-                  ("injection_pressure_MPa_label", "喷射压力（MPa）"), ("velocity_coefficient", "速度系数Cv（可留空）")]
+                  ("injection_pressure_MPa_label", "喷射压力（MPa）"), ("velocity_coefficient", "速度系数Cv（可留空）"),
+                  ("source_preservation_strength", "V6.1喷雾保留强度（0—1）")]
         for row, (key, label) in enumerate(fields):
             ttk.Label(settings, text=label).grid(row=row*2, column=0, sticky="w", pady=(6, 0))
             ttk.Entry(settings, textvariable=self.variables[key], width=30).grid(row=row*2+1, column=0, sticky="ew")
         ttk.Checkbutton(settings, text="喷射压力及压力基准已确认", variable=self.pressure_confirmed).grid(row=2*len(fields), column=0, sticky="w", pady=7)
-        ttk.Label(settings, text="V6：真实纹理配对去白，尚未验收。\nV5：三帧分层，保留作对照。\nV4：历史黑底前景。\n紫色表示低证据或未知。", foreground="#555555").grid(row=2*len(fields)+1, column=0, sticky="w", pady=6)
+        ttk.Label(settings, text="V6.1：内圈保守保留，尚未验收。\nV6：原去白模型，保留作对照。\n保留强度0关闭保护，1最保守。\n紫色表示低证据或未知。", foreground="#555555").grid(row=2*len(fields)+1, column=0, sticky="w", pady=6)
         right = ttk.Frame(middle); right.pack(side="left", fill="both", expand=True)
         controls = ttk.Frame(right); controls.pack(fill="x")
         ttk.Button(controls, text="加载 / 自动估计", command=self.load_preview).pack(side="left", padx=(0, 5))

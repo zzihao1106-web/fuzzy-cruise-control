@@ -161,6 +161,12 @@ def process_gray(args):
     b, g = crop_resize(reference, bounds, args.size), crop_resize(gray, bounds, args.size)
     bundle = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     real_texture = bundle.get("kind") == "counterfactual_real_texture"
+    preserve_spray = bool(bundle.get("preservation_guard_enabled")) and not getattr(args, "disable_preservation", False)
+    if preserve_spray:
+        from spray_preservation import preserve_source_spray
+        (out/"preservation_adjustment").mkdir(exist_ok=True)
+        if cfg.get("source_preservation_strength") is None:
+            cfg["source_preservation_strength"] = 0.95
     if bundle.get("kind") not in {"temporal_gray_scene", "counterfactual_real_texture"}:
         raise ValueError("请选择V5/V6灰底场景权重；旧黑底恢复模型不兼容。")
     if real_texture:
@@ -214,6 +220,11 @@ def process_gray(args):
         # V6覆盖近似加性反光，不再强加S<=1-T这一仅对特定混合模型成立的条件。
         physical_tmax = np.clip(physical_tmax, 0, 1)
         transmission = np.minimum(1-a, physical_tmax)
+        preservation_adjustment = np.zeros_like(image)
+        preservation_unknown = np.zeros_like(image, dtype=bool)
+        if preserve_spray:
+            transmission, preservation_adjustment, preservation_unknown = preserve_source_spray(
+                image, previous, following, reference, gray, transmission, noise, cfg, roi)
         replaced = image-transmission*(estimated_bg-gray)
         original = read_gray(path)
         result = np.clip(original*(1-maps["weight"])+replaced*maps["weight"], 0, 1)
@@ -222,12 +233,15 @@ def process_gray(args):
         delta = np.abs(image-estimated_bg)
         unknown = ((a > 0.08) & (delta < np.maximum(0.025, noise*3)) & (np.abs(estimated_bg-gray) > 0.04))
         unknown |= ((1-a-transmission) > 0.12) | ((original > 0.985) & (np.abs(reference-gray) > 0.03))
+        unknown |= preservation_unknown
         unknown &= roi & (maps["weight"] > 0.5)
         filename = f"{i+1:06d}.png"
         saved = out/"gray_frames"/filename
         save_gray(saved, result)
         save_gray(out/"opacity"/filename, (1-transmission)*maps["weight"])
         save_gray(out/"restoration_unknown"/filename, unknown)
+        if preserve_spray:
+            save_gray(out/"preservation_adjustment"/filename, preservation_adjustment*maps["weight"])
         preview = Image.open(saved).convert("RGB").resize((640, 400))
         ImageDraw.Draw(preview).text((10, 8), f"{i+1:03d} 灰底场景估计", font=font(18), fill="white", stroke_width=1, stroke_fill="black")
         animation.append(preview)
@@ -244,6 +258,8 @@ def process_gray(args):
                         "photometry": photometry[i], "unknown_pixels": int(unknown.sum()),
                         "empty_surface_std_gray": float(result[surface].std()*255) if i < count else None,
                         "nozzle_core_preserved": True, "clipped_pixels_roi": int(((replaced < 0) | (replaced > 1))[roi].sum())})
+        if preserve_spray:
+            records[-1]["preservation_adjusted_pixels"] = int(((preservation_adjustment > 2/255) & (maps["weight"] > 0.5)).sum())
         if (i+1) % 10 == 0 or i+1 == len(paths):
             print(f"灰底逐帧恢复 {i+1}/{len(paths)}", flush=True)
     animation[0].save(out/"灰底场景动画.gif", save_all=True, append_images=animation[1:], duration=100, loop=0, disposal=2)
@@ -271,6 +287,10 @@ def process_gray(args):
                "model_input": "前帧、当前帧、后帧、原背景、灰底参考及差分通道",
                "equation": "J=I-T*(B_lit-B_gray)，T由网络及成像范围约束共同估计",
                "network_response_calibrated_on_empty_reference": True, "nozzle_core_preserved": True,
+               "spray_preservation_enabled": preserve_spray,
+               "source_preservation_strength": cfg.get("source_preservation_strength") if preserve_spray else None,
+               "model_weights_retrained": bundle.get("model_weights_retrained", True),
+               "parent_model_version": bundle.get("parent_version"),
                "boundary": boundary, "human_labels": 0, "real_accuracy_available": False,
                "empty_surface_std_gray": [r["empty_surface_std_gray"] for r in records[:count]],
                "quantitative_measurement_valid": False, "seconds": time.perf_counter()-start,
@@ -333,6 +353,7 @@ def main():
     process.add_argument("--size", type=int, default=256); process.add_argument("--device", default="auto")
     process.add_argument("--reuse-geometry", action="store_true")
     process.add_argument("--batch", action="store_true")
+    process.add_argument("--disable-preservation", action="store_true", help="仅用于V6.1保留策略消融对照")
     args = p.parse_args()
     if args.operation == "prepare":
         prepare_gray(args)

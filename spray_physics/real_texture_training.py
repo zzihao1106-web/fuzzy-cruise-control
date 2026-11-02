@@ -16,7 +16,7 @@ from gray_background import uniform_gray_variants
 from gray_scene_data import temporal_channels
 from restore_model import ReferenceRestorer
 
-VERSION = "6.0.0-alpha1"
+VERSION = "6.1.0-alpha1"
 
 
 class RealTextureRestorer(ReferenceRestorer):
@@ -55,13 +55,18 @@ def prepare_real(args):
     valid &= crop_resize(roi, bounds, n, True) > 0.5
     yy, xx = np.indices((n, n)); x0, y0, x1, y1 = bounds
     sx, sy = cfg["source_xy"]
-    valid &= np.hypot(xx-(sx-x0)/(x1-x0)*n, yy-(sy-y0)/(y1-y0)*n) > n*0.09
-    valid = cv2.erode(valid.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
+    distance = np.hypot(xx-(sx-x0)/(x1-x0)*n, yy-(sy-y0)/(y1-y0)*n)
+    core_px = max(18, min(cfg["chamber_axes_px"])*0.065)
+    core_small = core_px*n/min(x1-x0, y1-y0)
+    # 只排除真实喷孔核心，修正V6约65像素内圈被整块排除的问题。
+    valid &= distance > core_small
+    valid = cv2.erode(valid.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    inner = np.exp(-(distance/(n*0.24))**2).astype(np.float32)
     # 只在照明接近灰底的真实区域建立参考；其余位置既不计损失也不当真值。
     pool = np.stack([np.clip(crop_resize(read_gray(p), bounds, n)-b+g, 0, 1) for p in paths])
     pool[:, ~valid] = g[~valid]
     out = Path(args.output); out.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(out/"real_texture_pool.npz", pool=pool, valid=valid, gray=g,
+    np.savez_compressed(out/"real_texture_pool.npz", pool=pool, valid=valid, gray=g, inner=inner,
                         highlight=np.maximum(b-g, 0))
     total = len(paths)
     train_end, val_start, val_end, test_start = int(total*0.43), int(total*0.57)+1, int(total*0.70), int(total*0.85)+1
@@ -71,6 +76,7 @@ def prepare_real(args):
             "test_frames_1based": list(range(test_start, total+1)),
             "unused_gap_frames_1based": list(range(train_end+1, val_start))+list(range(val_end+1, test_start)),
             "reference_background_frames": [1, 2, 3], "valid_fraction": float(valid.mean()),
+            "excluded_core_radius_original_px": float(core_px), "inner_region_weighted": True,
             "human_labels": 0, "pristine_real_spray_ground_truth": False,
             "meaning": "真实清晰区域经小幅背景校正后的代理参考；反事实加光验证，不等于原始重合区真值"}
     write_json(out/"real_texture_manifest.json", info)
@@ -81,6 +87,7 @@ class RealRelightingPairs:
     def __init__(self, data, split, seed):
         with np.load(data/"real_texture_pool.npz") as z:
             self.pool, self.valid, self.gray, self.highlight = (z[k] for k in ("pool", "valid", "gray", "highlight"))
+            self.inner = z["inner"] if "inner" in z else np.zeros_like(self.gray)
         self.manifest = json.loads((data/"real_texture_manifest.json").read_text(encoding="utf-8"))
         self.indices = np.array(self.manifest[split+"_frames_1based"])-1
         self.rng = np.random.default_rng(seed)
@@ -122,7 +129,9 @@ class RealRelightingPairs:
             observed.append(np.clip(obs, 0, 1)); trans.append(t)
         # 饱和像素不提供恢复真值，不用它们的误差粉饰结果。
         valid &= observed[1] < 0.98
-        target = {"gray": clean[1][None], "transmission": trans[1][None], "valid": valid[None].astype(np.float32)}
+        inner = np.clip(rotate(self.inner), 0, 1)
+        target = {"gray": clean[1][None], "transmission": trans[1][None], "valid": valid[None].astype(np.float32),
+                  "inner": inner[None]}
         x = temporal_channels(observed[0], observed[1], observed[2], g+highlight, g)
         return x, target
 
@@ -140,7 +149,10 @@ def pair_loss(z, target, x):
     # 喷雾与背景分别归一化，避免早期小喷雾被大面积背景淹没后退化成静态相减。
     mae = balanced((z["gray"]-target["gray"]).abs())
     t_loss = balanced((z["transmission"]-target["transmission"]).abs())
-    return mae*4+t_loss*0.25
+    # 单独惩罚内圈喷雾被过度压暗；常规误差仍约束增亮，防止用白斑冒充喷雾。
+    inner = target.get("inner", torch.zeros_like(valid))*valid*fg
+    darkening = ((target["gray"]-z["gray"]).clamp_min(0)*inner).sum()/inner.sum().clamp_min(1)
+    return mae*4+t_loss*0.25+darkening*2
 
 
 def covariance_gray(x):
@@ -165,7 +177,7 @@ def evaluate_pairs(model, data, device, split="validation", batches=6, seed=7139
                        "covariance": covariance_gray(x), "static_subtraction": x[:, 1:2]-(x[:, 3:4]-x[:, 4:5]),
                        "flat_field": x[:, 1:2]*x[:, 4:5]/np.maximum(x[:, 3:4], 1/255)}
             if baseline is not None:
-                outputs["v5"] = baseline.decompose(inputs)["gray"].cpu().numpy()
+                outputs[getattr(baseline, "comparison_label", "previous_model")] = baseline.decompose(inputs)["gray"].cpu().numpy()
             valid = y["valid"] > 0.5
             fg = valid & (np.abs(y["gray"]-x[:, 4:5]) > 0.04)
             bg = valid & (np.abs(y["gray"]-x[:, 4:5]) < 0.02)
@@ -175,6 +187,11 @@ def evaluate_pairs(model, data, device, split="validation", batches=6, seed=7139
                 for key, mask in (("fg_mae", fg), ("bg_mae", bg), ("glare_overlap_fg_mae", affected)):
                     pair = counters.setdefault(key, [0., 0])
                     pair[0] += float(np.abs(prediction-y["gray"])[mask].sum()); pair[1] += int(mask.sum())
+                inner_fg = fg & (y.get("inner", np.zeros_like(y["gray"])) > 0.35)
+                for key, error in (("inner_fg_mae", np.abs(prediction-y["gray"])),
+                                   ("inner_fg_darkening", np.maximum(y["gray"]-prediction, 0))):
+                    pair = counters.setdefault(key, [0., 0])
+                    pair[0] += float(error[inner_fg].sum()); pair[1] += int(inner_fg.sum())
     scores = {name: {k: a/max(n, 1) for k, (a, n) in counters.items()} for name, counters in sums.items()}
     return {"split": split, "samples": batches*4, "scores": scores,
             "proxy_relighting_test_only": True, "original_glare_region_ground_truth_available": False}
@@ -207,9 +224,10 @@ def train_real(args):
         if step % 200 == 0 or step == args.steps:
             result = evaluate_pairs(model, data, device)
             score = result["scores"]["real_texture_network"]
-            rank = score["fg_mae"]+score["bg_mae"]+score["glare_overlap_fg_mae"]
+            rank = score["fg_mae"]+score["bg_mae"]+score["glare_overlap_fg_mae"]+score["inner_fg_mae"]*0.5+score["inner_fg_darkening"]
             state = {"version": VERSION, "kind": "counterfactual_real_texture", "spec": model.spec,
-                     "model": model.state_dict(), "step": step, "validation": result, "human_labels": 0}
+                     "model": model.state_dict(), "step": step, "validation": result, "human_labels": 0,
+                     "preservation_guard_enabled": True}
             torch.save(state, out/"real_texture_last.pt")
             if rank < best:
                 best = rank; torch.save(state, out/"real_texture_best.pt")
@@ -221,7 +239,9 @@ def train_real(args):
     if args.baseline:
         from gray_scene_model import TemporalGrayRestorer
         old = torch.load(args.baseline, map_location="cpu", weights_only=True)
-        baseline = TemporalGrayRestorer(**old["spec"]).to(device).eval(); baseline.load_state_dict(old["model"])
+        model_type = RealTextureRestorer if old.get("kind") == "counterfactual_real_texture" else TemporalGrayRestorer
+        baseline = model_type(**old["spec"]).to(device).eval(); baseline.load_state_dict(old["model"])
+        baseline.comparison_label = "baseline_"+old["version"]
     test = evaluate_pairs(model, data, device, "test", 16, 984205, baseline)
     write_json(out/"heldout_comparison.json", test)
     write_json(out/"training_summary.json", {"version": VERSION, "steps": args.steps, "best_step": state["step"],
